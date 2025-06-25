@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ChevronDown, ChevronUp, Store, TrendingUp, DollarSign, Users, Shield, Building } from 'lucide-react';
-// ...Pega aquí el código completo del dashboard...
-// (Es el mismo bloque grande de código que te he pasado antes)
+
+// NOTA: El nombre del componente no importa, pero lo dejamos como Dashboard por consistencia.
 const Dashboard = () => {
   const [showNorteDetails, setShowNorteDetails] = useState(false);
   const [showSurDetails, setShowSurDetails] = useState(false);
+
   const rawData = [
     { tienda: "CHEDRAUI EDUARDO MOLINA", zona: "Norte", semana1_ops: 128, semana1_monto: 676.50, semana2_ops: 75, semana2_monto: 659.00, semana3_ops: 132, semana3_monto: 551.86 },
     { tienda: "EXP CHEDRAUI ANFORA", zona: "Norte", semana1_ops: 30, semana1_monto: 564.94, semana2_ops: 211, semana2_monto: 611.22, semana3_ops: 189, semana3_monto: 586.60 },
@@ -23,6 +24,7 @@ const Dashboard = () => {
     { tienda: "EXP PLAZA TOLLOCAN", zona: "Sur", semana1_ops: 8, semana1_monto: 491.50, semana2_ops: 7, semana2_monto: 504.71, semana3_ops: 6, semana3_monto: 682.33 },
     { tienda: "EXP SENDERO TOLUCA II", zona: "Sur", semana1_ops: 17, semana1_monto: 608.00, semana2_ops: 256, semana2_monto: 644.38, semana3_ops: 234, semana3_monto: 609.45 }
   ];
+
   const totales = useMemo(() => {
     const totalOperaciones = rawData.reduce((sum, item) => sum + item.semana1_ops + item.semana2_ops + item.semana3_ops, 0);
     const totalMontos = rawData.reduce((sum, item) => sum + item.semana1_monto + item.semana2_monto + item.semana3_monto, 0);
@@ -34,6 +36,7 @@ const Dashboard = () => {
       access: totalMontos.toFixed(2)
     };
   }, [rawData]);
+
   const dataZonas = useMemo(() => {
     const norte = rawData.filter(item => item.zona === "Norte");
     const sur = rawData.filter(item => item.zona === "Sur");
@@ -46,8 +49,10 @@ const Dashboard = () => {
       { zona: "Sur", operaciones: surTotal, ingresos: surMontos }
     ];
   }, [rawData]);
+
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
   const formatCurrency = (value) => `$${value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
       <div className="max-w-7xl mx-auto">
@@ -105,8 +110,20 @@ const Dashboard = () => {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={rawData.filter(item => item.zona === "Norte").map(item => ({ name: item.tienda, value: item.semana1_ops + item.semana2_ops + item.semana3_ops }))} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value">
-                    {rawData.filter(item => item.zona === "Norte").map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                  <Pie
+                    data={rawData.filter(item => item.zona === "Norte").map(item => ({
+                      name: item.tienda.split(' ').slice(-2).join(' '),
+                      value: item.semana1_ops + item.semana2_ops + item.semana3_ops
+                    }))}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {rawData.filter(item => item.zona === "Norte").map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
                   </Pie>
                   <Tooltip formatter={(value, name) => [value.toLocaleString(), name]}/>
                   <Legend />
@@ -119,8 +136,20 @@ const Dashboard = () => {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={rawData.filter(item => item.zona === "Sur").map(item => ({ name: item.tienda, value: item.semana1_ops + item.semana2_ops + item.semana3_ops }))} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value">
-                    {rawData.filter(item => item.zona === "Sur").map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                  <Pie
+                    data={rawData.filter(item => item.zona === "Sur").map(item => ({
+                      name: item.tienda.split(' ').slice(-2).join(' '),
+                      value: item.semana1_ops + item.semana2_ops + item.semana3_ops
+                    }))}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {rawData.filter(item => item.zona === "Sur").map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
                   </Pie>
                   <Tooltip formatter={(value, name) => [value.toLocaleString(), name]}/>
                   <Legend />
@@ -131,7 +160,10 @@ const Dashboard = () => {
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white rounded-xl shadow-lg p-6">
-            <button onClick={() => setShowNorteDetails(!showNorteDetails)} className="w-full flex items-center justify-between p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+            <button
+              onClick={() => setShowNorteDetails(!showNorteDetails)}
+              className="w-full flex items-center justify-between p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+            >
               <div className="flex items-center">
                 <Store className="w-5 h-5 text-blue-600 mr-2" />
                 <span className="font-semibold text-blue-800">Ver Detalles Zona Norte</span>
@@ -144,9 +176,18 @@ const Dashboard = () => {
                   <div key={index} className="border rounded-lg p-4 bg-slate-50">
                     <h4 className="font-semibold text-slate-800 mb-2">{tienda.tienda}</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-                      <div><span className="text-slate-600">Sem 1:</span><span className="ml-1 font-medium">{tienda.semana1_ops} ops | {formatCurrency(tienda.semana1_monto)}</span></div>
-                      <div><span className="text-slate-600">Sem 2:</span><span className="ml-1 font-medium">{tienda.semana2_ops} ops | {formatCurrency(tienda.semana2_monto)}</span></div>
-                      <div><span className="text-slate-600">Sem 3:</span><span className="ml-1 font-medium">{tienda.semana3_ops} ops | {formatCurrency(tienda.semana3_monto)}</span></div>
+                      <div>
+                        <span className="text-slate-600">Sem 1:</span>
+                        <span className="ml-1 font-medium">{tienda.semana1_ops} ops | {formatCurrency(tienda.semana1_monto)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-600">Sem 2:</span>
+                        <span className="ml-1 font-medium">{tienda.semana2_ops} ops | {formatCurrency(tienda.semana2_monto)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-600">Sem 3:</span>
+                        <span className="ml-1 font-medium">{tienda.semana3_ops} ops | {formatCurrency(tienda.semana3_monto)}</span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -154,7 +195,10 @@ const Dashboard = () => {
             )}
           </div>
           <div className="bg-white rounded-xl shadow-lg p-6">
-            <button onClick={() => setShowSurDetails(!showSurDetails)} className="w-full flex items-center justify-between p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
+            <button
+              onClick={() => setShowSurDetails(!showSurDetails)}
+              className="w-full flex items-center justify-between p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+            >
               <div className="flex items-center">
                 <Store className="w-5 h-5 text-green-600 mr-2" />
                 <span className="font-semibold text-green-800">Ver Detalles Zona Sur</span>
@@ -167,9 +211,18 @@ const Dashboard = () => {
                   <div key={index} className="border rounded-lg p-4 bg-slate-50">
                     <h4 className="font-semibold text-slate-800 mb-2">{tienda.tienda}</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-                      <div><span className="text-slate-600">Sem 1:</span><span className="ml-1 font-medium">{tienda.semana1_ops} ops | {formatCurrency(tienda.semana1_monto)}</span></div>
-                      <div><span className="text-slate-600">Sem 2:</span><span className="ml-1 font-medium">{tienda.semana2_ops} ops | {formatCurrency(tienda.semana2_monto)}</span></div>
-                      <div><span className="text-slate-600">Sem 3:</span><span className="ml-1 font-medium">{tienda.semana3_ops} ops | {formatCurrency(tienda.semana3_monto)}</span></div>
+                      <div>
+                        <span className="text-slate-600">Sem 1:</span>
+                        <span className="ml-1 font-medium">{tienda.semana1_ops} ops | {formatCurrency(tienda.semana1_monto)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-600">Sem 2:</span>
+                        <span className="ml-1 font-medium">{tienda.semana2_ops} ops | {formatCurrency(tienda.semana2_monto)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-600">Sem 3:</span>
+                        <span className="ml-1 font-medium">{tienda.semana3_ops} ops | {formatCurrency(tienda.semana3_monto)}</span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -184,5 +237,4 @@ const Dashboard = () => {
     </div>
   );
 };
-const App = Dashboard;
-export default App;
+export default Dashboard;
