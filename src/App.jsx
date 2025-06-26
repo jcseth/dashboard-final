@@ -2,6 +2,25 @@ import React, { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ChevronDown, ChevronUp, Store, TrendingUp, DollarSign, Users, Shield, Building } from 'lucide-react';
 
+// --- Componente Reutilizable para las nuevas gráficas de comparación ---
+const CategoryComparisonChart = ({ title, data, color }) => (
+  <div className="bg-white rounded-xl shadow-lg p-6">
+    <h3 className="text-xl font-bold text-slate-800 mb-4">{title}</h3>
+    <div style={{ height: 250 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis type="number" />
+          <YAxis type="category" dataKey="zona" width={50} />
+          <Tooltip cursor={{fill: '#f0f0f0'}} formatter={(value) => value.toLocaleString()} />
+          <Bar dataKey="total" fill={color} name="Total" barSize={40} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+);
+
+
 const Dashboard = () => {
   const [showNorteDetails, setShowNorteDetails] = useState(false);
   const [showSurDetails, setShowSurDetails] = useState(false);
@@ -93,7 +112,7 @@ const Dashboard = () => {
       renovaciones: sumReducer('renovaciones'),
       seguros: sumReducer('seguros'),
       simplesEmpresariales: sumReducer('simples'),
-      access: 600.96 // <-- CAMBIO 1: Valor fijo como solicitaste
+      access: 600.96
     };
   }, [dashboardData]);
 
@@ -112,23 +131,30 @@ const Dashboard = () => {
     };
     return [calculateZoneData("Norte"), calculateZoneData("Sur")];
   }, [dashboardData]);
+  
+  // --- Datos para las nuevas gráficas de comparación ---
+  const categoryComparisonData = useMemo(() => {
+    const getZoneTotal = (zona, category) => 
+      dashboardData.filter(item => item.zona === zona)
+                   .reduce((sum, item) => sum + item.semana1[category] + item.semana2[category] + item.semana3[category], 0);
 
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#6366F1', '#EC4899'];
+    return {
+      nuevas: [{ zona: 'Norte', total: getZoneTotal('Norte', 'nuevas') }, { zona: 'Sur', total: getZoneTotal('Sur', 'nuevas') }],
+      renovaciones: [{ zona: 'Norte', total: getZoneTotal('Norte', 'renovaciones') }, { zona: 'Sur', total: getZoneTotal('Sur', 'renovaciones') }],
+      seguros: [{ zona: 'Norte', total: getZoneTotal('Norte', 'seguros') }, { zona: 'Sur', total: getZoneTotal('Sur', 'seguros') }],
+      simples: [{ zona: 'Norte', total: getZoneTotal('Norte', 'simples') }, { zona: 'Sur', total: getZoneTotal('Sur', 'simples') }],
+    }
+  }, [dashboardData]);
+
   const formatCurrency = (value) => `$${parseFloat(value).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const getStoreTotalOps = (store) => 
-    (store.semana1.nuevas + store.semana1.renovaciones + store.semana1.seguros + store.semana1.simples) +
-    (store.semana2.nuevas + store.semana2.renovaciones + store.semana2.seguros + store.semana2.simples) +
-    (store.semana3.nuevas + store.semana3.renovaciones + store.semana3.seguros + store.semana3.simples);
-
-  // --- CAMBIO 3: Componente para la nueva tabla de detalles ---
   const DetailsTable = ({ tienda }) => {
     const categories = ['nuevas', 'renovaciones', 'seguros', 'simples', 'access'];
     const categoryNames = {
       nuevas: 'Nuevas y Ad.',
       renovaciones: 'Renovaciones',
       seguros: 'Seguros',
-      simples: 'S. Empresariales',
+      simples: 'Simples Emp.', // <-- CAMBIO 2: Abreviatura para que quepa bien
       access: 'Access'
     };
 
@@ -145,16 +171,17 @@ const Dashboard = () => {
           const s1 = tienda.semana1[cat];
           const s2 = tienda.semana2[cat];
           const s3 = tienda.semana3[cat];
-          const total = s1 + s2 + s3;
           const isCurrency = cat === 'access';
+          // <-- CAMBIO 3: El total de Access ahora es promedio
+          const total = isCurrency ? (s1 + s2 + s3) / 3 : s1 + s2 + s3;
 
           return (
-            <div key={cat} className="grid grid-cols-5 gap-2 text-center py-1 even:bg-slate-50">
+            <div key={cat} className="grid grid-cols-5 gap-2 text-center py-1 even:bg-slate-50 items-center">
               <div className="font-semibold text-left">{categoryNames[cat]}</div>
-              <div>{isCurrency ? formatCurrency(s1) : s1}</div>
-              <div>{isCurrency ? formatCurrency(s2) : s2}</div>
-              <div>{isCurrency ? formatCurrency(s3) : s3}</div>
-              <div className="font-bold">{isCurrency ? formatCurrency(total) : total}</div>
+              <div>{isCurrency ? formatCurrency(s1) : s1.toLocaleString()}</div>
+              <div>{isCurrency ? formatCurrency(s2) : s2.toLocaleString()}</div>
+              <div>{isCurrency ? formatCurrency(s3) : s3.toLocaleString()}</div>
+              <div className="font-bold">{isCurrency ? formatCurrency(total) : total.toLocaleString()}</div>
             </div>
           );
         })}
@@ -193,13 +220,14 @@ const Dashboard = () => {
             </div>
             <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-purple-500">
                 <DollarSign className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-                <h3 className="font-semibold text-slate-700 mb-1">Access (Ingresos)</h3>
+                {/* <-- CAMBIO 1: Título de la tarjeta corregido --> */}
+                <h3 className="font-semibold text-slate-700 mb-1">Access</h3>
                 <p className="text-2xl font-bold text-slate-800">{formatCurrency(totales.access)}</p>
             </div>
         </div>
         
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <h2 className="text-2xl font-bold text-slate-800 mb-4">Resumen Región Centro</h2>
+          <h2 className="text-2xl font-bold text-slate-800 mb-4">Resumen General por Zona</h2>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dataZonas}>
@@ -215,50 +243,17 @@ const Dashboard = () => {
             </ResponsiveContainer>
           </div>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <div className="bg-white rounded-xl shadow-lg p-6">
-                <h3 className="text-xl font-bold text-slate-800 mb-4">Operaciones por Tienda (Norte)</h3>
-                <div style={{height: 300}}>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie data={dashboardData.filter(item => item.zona === "Norte")} 
-                                 dataKey={getStoreTotalOps} 
-                                 nameKey="tienda" 
-                                 cx="50%" cy="50%" 
-                                 outerRadius={100} 
-                                 fill="#8884d8">
-                                {dashboardData.filter(item => item.zona === "Norte").map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>
-                            <Tooltip formatter={(value, name) => [value.toLocaleString(), name.split(' ').slice(1).join(' ')]}/>
-                            <Legend />
-                        </PieChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-            <div className="bg-white rounded-xl shadow-lg p-6">
-                <h3 className="text-xl font-bold text-slate-800 mb-4">Operaciones por Tienda (Sur)</h3>
-                <div style={{height: 300}}>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie data={dashboardData.filter(item => item.zona === "Sur")} 
-                                 dataKey={getStoreTotalOps} 
-                                 nameKey="tienda" 
-                                 cx="50%" cy="50%" 
-                                 outerRadius={100} 
-                                 fill="#8884d8">
-                                {dashboardData.filter(item => item.zona === "Sur").map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>
-                            <Tooltip formatter={(value, name) => [value.toLocaleString(), name.split(' ').slice(1).join(' ')]}/>
-                            <Legend />
-                        </PieChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
+        
+        {/* --- CAMBIO 5: Nuevas gráficas comparativas por categoría --- */}
+        <div className="text-center mb-8 mt-12">
+            <h2 className="text-3xl font-bold text-slate-800 mb-2">Comparativa por Categoría</h2>
+            <p className="text-slate-600">Análisis de rendimiento entre Zona Norte y Zona Sur.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <CategoryComparisonChart title="Nuevas y Adiciones" data={categoryComparisonData.nuevas} color="#3B82F6" />
+            <CategoryComparisonChart title="Renovaciones" data={categoryComparisonData.renovaciones} color="#10B981" />
+            <CategoryComparisonChart title="Seguros" data={categoryComparisonData.seguros} color="#F59E0B" />
+            <CategoryComparisonChart title="Simples Empresariales" data={categoryComparisonData.simples} color="#EF4444" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -302,10 +297,7 @@ const Dashboard = () => {
             </div>
         </div>
 
-        {/* --- CAMBIO 2: Pie de página simplificado --- */}
-        <div className="text-center mt-8 text-slate-500 text-sm">
-          Región Centro
-        </div>
+        {/* --- CAMBIO 4: Pie de página eliminado --- */}
       </div>
     </div>
   );
