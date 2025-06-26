@@ -222,15 +222,22 @@ const Dashboard = () => {
     );
   };
   
+  // --- FUNCIÓN MODIFICADA ---
   const getStoreSummaryData = (tienda) => {
-    const metrics = [{ key: 'activaciones', name: 'Activaciones' }, { key: 'renovaciones', name: 'Renovaciones' }, { key: 'seguros', name: 'Seguros' }, { key: 'simples', name: 'Simples Emp.' }, { key: 'accessFee', name: 'Access Fee' }];
+    // Hemos eliminado la línea de 'accessFee' de este arreglo.
+    const metrics = [
+      { key: 'activaciones', name: 'Activaciones' },
+      { key: 'renovaciones', name: 'Renovaciones' },
+      { key: 'seguros', name: 'Seguros' },
+      { key: 'simples', name: 'Simples Emp.' }
+    ];
+
     return metrics.map(metric => {
       const s1 = tienda.semana1?.[metric.key] ?? 0;
       const s2 = tienda.semana2?.[metric.key] ?? 0;
       const s3 = tienda.semana3?.[metric.key] ?? 0;
       const totalSum = s1 + s2 + s3;
-      const value = metric.key === 'accessFee' ? (totalSum / 3) : totalSum;
-      return { metric: metric.name, total: value };
+      return { metric: metric.name, total: totalSum };
     });
   };
 
