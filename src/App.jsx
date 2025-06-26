@@ -25,7 +25,6 @@ const Dashboard = () => {
   const [showSurDetails, setShowSurDetails] = useState(false);
   const [showComparisons, setShowComparisons] = useState(false);
 
-  // --- ESTRUCTURA DE DATOS CON TERMINOLOGÍA ACTUALIZADA ---
   const dashboardData = [
     { tienda: "CHEDRAUI EDUARDO MOLINA", zona: "Norte",
       semana1: { activaciones: 12, renovaciones: 8, seguros: 5, simples: 0, accessFee: 676.50 },
@@ -104,7 +103,6 @@ const Dashboard = () => {
     },
   ];
 
-  // --- CÁLCULO PARA LAS TARJETAS DE RESUMEN ---
   const totales = useMemo(() => {
     const sumReducer = (category) => dashboardData.reduce((sum, item) => 
       sum + item.semana1[category] + item.semana2[category] + item.semana3[category], 0);
@@ -114,12 +112,12 @@ const Dashboard = () => {
       totalRenovaciones: sumReducer('renovaciones'),
       totalSeguros: sumReducer('seguros'),
       totalSimples: sumReducer('simples'),
-      totalAccessFee: sumReducer('accessFee'),
+      totalAccessFee: 600.96, // <-- CAMBIO 2: Vuelve a ser el promedio fijo.
     };
   }, [dashboardData]);
   
-  // --- CÁLCULO PARA LA GRÁFICA PRINCIPAL AGRUPADA ---
-  const groupedChartData = useMemo(() => {
+  // --- CÁLCULO PARA LAS NUEVAS GRÁFICAS DE RESUMEN POR ZONA ---
+  const zoneSummaryData = useMemo(() => {
     const metrics = [
       { key: 'activaciones', name: 'Activaciones' },
       { key: 'renovaciones', name: 'Renovaciones' },
@@ -127,37 +125,34 @@ const Dashboard = () => {
       { key: 'simples', name: 'Simples Emp.' },
       { key: 'accessFee', name: 'Access Fee' }
     ];
+    
+    const calculateTotals = (zona) => {
+      return metrics.map(metric => {
+        const total = dashboardData
+          .filter(d => d.zona === zona)
+          .reduce((sum, item) => sum + item.semana1[metric.key] + item.semana2[metric.key] + item.semana3[metric.key], 0);
+        return { metric: metric.name, total: metric.key === 'accessFee' ? parseFloat(total.toFixed(2)) : total };
+      });
+    };
 
-    return metrics.map(metric => {
-      const norteTotal = dashboardData
-        .filter(d => d.zona === 'Norte')
-        .reduce((sum, item) => sum + item.semana1[metric.key] + item.semana2[metric.key] + item.semana3[metric.key], 0);
-      
-      const surTotal = dashboardData
-        .filter(d => d.zona === 'Sur')
-        .reduce((sum, item) => sum + item.semana1[metric.key] + item.semana2[metric.key] + item.semana3[metric.key], 0);
-
-      return {
-        metric: metric.name,
-        'Zona Norte': norteTotal,
-        'Zona Sur': surTotal,
-      };
-    });
+    return {
+      norte: calculateTotals('Norte'),
+      sur: calculateTotals('Sur'),
+    };
   }, [dashboardData]);
 
-  // --- CÁLCULO PARA LAS GRÁFICAS INFERIORES ---
   const categoryComparisonData = useMemo(() => {
-      const getZoneTotal = (zona, category) => 
-        dashboardData.filter(item => item.zona === zona)
-                     .reduce((sum, item) => sum + item.semana1[category] + item.semana2[category] + item.semana3[category], 0);
+    const getZoneTotal = (zona, category) => 
+      dashboardData.filter(item => item.zona === zona)
+                   .reduce((sum, item) => sum + item.semana1[category] + item.semana2[category] + item.semana3[category], 0);
 
-      return {
-          activaciones: [{ zona: 'Norte', total: getZoneTotal('Norte', 'activaciones') }, { zona: 'Sur', total: getZoneTotal('Sur', 'activaciones') }],
-          renovaciones: [{ zona: 'Norte', total: getZoneTotal('Norte', 'renovaciones') }, { zona: 'Sur', total: getZoneTotal('Sur', 'renovaciones') }],
-          seguros: [{ zona: 'Norte', total: getZoneTotal('Norte', 'seguros') }, { zona: 'Sur', total: getZoneTotal('Sur', 'seguros') }],
-          simples: [{ zona: 'Norte', total: getZoneTotal('Norte', 'simples') }, { zona: 'Sur', total: getZoneTotal('Sur', 'simples') }],
-          accessFee: [{ zona: 'Norte', total: getZoneTotal('Norte', 'accessFee') }, { zona: 'Sur', total: getZoneTotal('Sur', 'accessFee') }],
-      }
+    return {
+      activaciones: [{ zona: 'Norte', total: getZoneTotal('Norte', 'activaciones') }, { zona: 'Sur', total: getZoneTotal('Sur', 'activaciones') }],
+      renovaciones: [{ zona: 'Norte', total: getZoneTotal('Norte', 'renovaciones') }, { zona: 'Sur', total: getZoneTotal('Sur', 'renovaciones') }],
+      seguros: [{ zona: 'Norte', total: getZoneTotal('Norte', 'seguros') }, { zona: 'Sur', total: getZoneTotal('Sur', 'seguros') }],
+      simples: [{ zona: 'Norte', total: getZoneTotal('Norte', 'simples') }, { zona: 'Sur', total: getZoneTotal('Sur', 'simples') }],
+      accessFee: [{ zona: 'Norte', total: getZoneTotal('Norte', 'accessFee') }, { zona: 'Sur', total: getZoneTotal('Sur', 'accessFee') }],
+    }
   }, [dashboardData]);
 
   const formatCurrency = (value) => `$${parseFloat(value).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -209,7 +204,6 @@ const Dashboard = () => {
           <h1 className="text-4xl font-bold text-slate-800 mb-2">Región Centro</h1>
         </div>
         
-        {/* --- TARJETAS DE RESUMEN RESTAURADAS --- */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
             <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-blue-500">
                 <Users className="w-8 h-8 text-blue-500 mx-auto mb-2" />
@@ -238,28 +232,42 @@ const Dashboard = () => {
             </div>
         </div>
         
-        {/* --- GRÁFICA PRINCIPAL AGRUPADA --- */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-12">
-          <h2 className="text-2xl font-bold text-slate-800 mb-4 text-center">Resumen Región Centro</h2>
-          <div className="h-96">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={groupedChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="metric" />
-                <YAxis yAxisId="left" orientation="left" />
-                <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => formatCurrency(value)} />
-                <Tooltip formatter={(value, name) => [typeof value === 'number' ? value.toLocaleString() : value, name]} />
-                <Legend />
-                <Bar yAxisId="left" dataKey="Zona Norte" fill="#3B82F6" name="Zona Norte (Ops)" />
-                <Bar yAxisId="left" dataKey="Zona Sur" fill="#10B981" name="Zona Sur (Ops)" />
-                {/* Nota: Access Fee usa el eje derecho, pero para mantener la agrupación, se dibuja aquí. 
-                    El tooltip y los ejes ayudan a diferenciar. Se puede mejorar si se necesita. */}
-              </BarChart>
-            </ResponsiveContainer>
+        {/* --- CAMBIO 1: NUEVAS GRÁFICAS DE RESUMEN SEPARADAS POR ZONA --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+          {/* Gráfica Zona Norte */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-2xl font-bold text-slate-800 mb-4 text-center">Resumen Zona Norte</h2>
+            <div className="h-96">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={zoneSummaryData.norte} layout="horizontal">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="metric" />
+                  <YAxis tickFormatter={(value) => (value > 1000 ? `${value / 1000}k` : value)} />
+                  <Tooltip formatter={(value, name) => [typeof value === 'number' ? value.toLocaleString('es-MX', {maximumFractionDigits: 2}) : value, name]}/>
+                  <Legend />
+                  <Bar dataKey="total" name="Total del Mes" fill="#3B82F6" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          {/* Gráfica Zona Sur */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-2xl font-bold text-slate-800 mb-4 text-center">Resumen Zona Sur</h2>
+            <div className="h-96">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={zoneSummaryData.sur} layout="horizontal">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="metric" />
+                  <YAxis tickFormatter={(value) => (value > 1000 ? `${value / 1000}k` : value)} />
+                  <Tooltip formatter={(value, name) => [typeof value === 'number' ? value.toLocaleString('es-MX', {maximumFractionDigits: 2}) : value, name]}/>
+                  <Legend />
+                  <Bar dataKey="total" name="Total del Mes" fill="#10B981" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
-        {/* --- SECCIONES DE DETALLES POR TIENDA --- */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
             <div className="bg-white rounded-xl shadow-lg p-6">
                 <button onClick={() => setShowNorteDetails(!showNorteDetails)} className="w-full flex items-center justify-between p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
@@ -301,7 +309,6 @@ const Dashboard = () => {
             </div>
         </div>
         
-        {/* --- SECCIÓN RETRÁCTIL DE COMPARATIVAS DETALLADAS --- */}
         <div className="mb-8">
             <button
                 onClick={() => setShowComparisons(!showComparisons)}
@@ -323,7 +330,6 @@ const Dashboard = () => {
                 </div>
             )}
         </div>
-
       </div>
     </div>
   );
