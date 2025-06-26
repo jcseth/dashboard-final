@@ -123,13 +123,28 @@ const Dashboard = () => {
   ];
 
   const totales = useMemo(() => {
-    const sumReducer = (category) => dashboardData.reduce((sum, item) => sum + item.semana1[category] + item.semana2[category] + item.semana3[category], 0);
+    const sumReducer = (category) => dashboardData.reduce((sum, item) => sum + (item.semana1?.[category] || 0) + (item.semana2?.[category] || 0) + (item.semana3?.[category] || 0), 0);
+    
+    let totalAccessFeeSum = 0;
+    let accessFeeCount = 0;
+    
+    dashboardData.forEach(item => {
+        ['semana1', 'semana2', 'semana3'].forEach(semana => {
+            if (item[semana]?.accessFee) {
+                totalAccessFeeSum += item[semana].accessFee;
+                accessFeeCount++;
+            }
+        });
+    });
+
+    const averageTotalAccessFee = accessFeeCount > 0 ? totalAccessFeeSum / accessFeeCount : 0;
+
     return {
       totalActivaciones: sumReducer('activaciones'),
       totalRenovaciones: sumReducer('renovaciones'),
       totalSeguros: sumReducer('seguros'),
       totalSimples: sumReducer('simples'),
-      totalAccessFee: 600.96,
+      totalAccessFee: averageTotalAccessFee, // <-- CORREGIDO: Promedio en lugar de estático
     };
   }, [dashboardData]);
   
@@ -142,7 +157,7 @@ const Dashboard = () => {
     ];
     const calculateTotals = (zona) => {
       return metrics.map(metric => {
-        const total = dashboardData.filter(d => d.zona === zona).reduce((sum, item) => sum + item.semana1[metric.key] + item.semana2[metric.key] + item.semana3[metric.key], 0);
+        const total = dashboardData.filter(d => d.zona === zona).reduce((sum, item) => sum + (item.semana1?.[metric.key] || 0) + (item.semana2?.[metric.key] || 0) + (item.semana3?.[metric.key] || 0), 0);
         return { metric: metric.name, total };
       });
     };
@@ -150,12 +165,36 @@ const Dashboard = () => {
   }, [dashboardData]);
 
   const categoryComparisonData = useMemo(() => {
-    const getZoneTotal = (zona, category) => dashboardData.filter(item => item.zona === zona).reduce((sum, item) => sum + item.semana1[category] + item.semana2[category] + item.semana3[category], 0);
-    const categories = ['activaciones', 'renovaciones', 'seguros', 'simples', 'accessFee'];
-    return categories.reduce((acc, category) => {
+    const getZoneTotal = (zona, category) => dashboardData.filter(item => item.zona === zona).reduce((sum, item) => sum + (item.semana1?.[category] || 0) + (item.semana2?.[category] || 0) + (item.semana3?.[category] || 0), 0);
+    
+    const getZoneAverage = (zona, category) => {
+        const storesInZone = dashboardData.filter(item => item.zona === zona);
+        let totalSum = 0;
+        let count = 0;
+        storesInZone.forEach(item => {
+            ['semana1', 'semana2', 'semana3'].forEach(semana => {
+                if(item[semana]?.[category]){
+                    totalSum += item[semana][category];
+                    count++;
+                }
+            });
+        });
+        return count > 0 ? totalSum / count : 0;
+    }
+
+    const categories = ['activaciones', 'renovaciones', 'seguros', 'simples'];
+    const result = categories.reduce((acc, category) => {
       acc[category] = [{ zona: 'Norte', total: getZoneTotal('Norte', category) }, { zona: 'Sur', total: getZoneTotal('Sur', category) }];
       return acc;
     }, {});
+
+    // Cálculo especial para Access Fee (promedio)
+    result['accessFee'] = [
+        { zona: 'Norte', total: getZoneAverage('Norte', 'accessFee') },
+        { zona: 'Sur', total: getZoneAverage('Sur', 'accessFee') }
+    ];
+
+    return result;
   }, [dashboardData]);
 
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#6366F1', '#EC4899'];
@@ -170,10 +209,11 @@ const Dashboard = () => {
           <div>Categoría</div><div>Sem 1</div><div>Sem 2</div><div>Sem 3</div><div>Total Mes</div>
         </div>
         {categories.map(cat => {
-          const s1 = tienda.semana1[cat];
-          const s2 = tienda.semana2[cat];
-          const s3 = tienda.semana3[cat];
+          const s1 = tienda.semana1?.[cat] || 0;
+          const s2 = tienda.semana2?.[cat] || 0;
+          const s3 = tienda.semana3?.[cat] || 0;
           const isCurrency = cat === 'accessFee';
+          // CORREGIDO: El total de Access Fee es el promedio, los demás son suma.
           const total = isCurrency ? (s1 + s2 + s3) / 3 : s1 + s2 + s3;
           return (
             <div key={cat} className="grid grid-cols-5 gap-2 text-center py-1 even:bg-slate-50 items-center">
@@ -192,10 +232,15 @@ const Dashboard = () => {
   const getStoreSummaryData = (tienda) => {
     const metrics = [{ key: 'activaciones', name: 'Activaciones' }, { key: 'renovaciones', name: 'Renovaciones' }, { key: 'seguros', name: 'Seguros' }, { key: 'simples', name: 'Simples Emp.' }, { key: 'accessFee', name: 'Access Fee' }];
     return metrics.map(metric => {
-      const total = tienda.semana1[metric.key] + tienda.semana2[metric.key] + tienda.semana3[metric.key];
-      return { metric: metric.name, total: metric.key === 'accessFee' ? parseFloat(total.toFixed(2)) : total };
+      const totalSum = (tienda.semana1?.[metric.key] || 0) + (tienda.semana2?.[metric.key] || 0) + (tienda.semana3?.[metric.key] || 0);
+      // CORREGIDO: Si es accessFee, promedia. Si no, suma.
+      const value = metric.key === 'accessFee' ? parseFloat((totalSum / 3).toFixed(2)) : totalSum;
+      return { metric: metric.name, total: value };
     });
   };
+
+  const tiendasNorte = dashboardData.filter(item => item.zona === "Norte");
+  const tiendasSur = dashboardData.filter(item => item.zona === "Sur");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
@@ -206,7 +251,7 @@ const Dashboard = () => {
             <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-green-500"><TrendingUp className="w-8 h-8 text-green-500 mx-auto mb-2" /><h3 className="font-semibold text-slate-700 mb-1">Renovaciones</h3><p className="text-2xl font-bold text-slate-800">{totales.totalRenovaciones.toLocaleString()}</p></div>
             <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-yellow-500"><Shield className="w-8 h-8 text-yellow-500 mx-auto mb-2" /><h3 className="font-semibold text-slate-700 mb-1">Seguros</h3><p className="text-2xl font-bold text-slate-800">{totales.totalSeguros.toLocaleString()}</p></div>
             <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-red-500"><Building className="w-8 h-8 text-red-500 mx-auto mb-2" /><h3 className="font-semibold text-slate-700 mb-1">Simples Empresariales</h3><p className="text-2xl font-bold text-slate-800">{totales.totalSimples.toLocaleString()}</p></div>
-            <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-purple-500"><DollarSign className="w-8 h-8 text-purple-500 mx-auto mb-2" /><h3 className="font-semibold text-slate-700 mb-1">Access Fee</h3><p className="text-2xl font-bold text-slate-800">{formatCurrency(totales.totalAccessFee)}</p></div>
+            <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-purple-500"><DollarSign className="w-8 h-8 text-purple-500 mx-auto mb-2" /><h3 className="font-semibold text-slate-700 mb-1">Promedio Access Fee</h3><p className="text-2xl font-bold text-slate-800">{formatCurrency(totales.totalAccessFee)}</p></div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
           <div className="bg-white rounded-xl shadow-lg p-6">
@@ -226,7 +271,7 @@ const Dashboard = () => {
                 </button>
                 {showNorteList && (
                     <div className="mt-4 space-y-2">
-                        {dashboardData.filter(item => item.zona === "Norte").map((tienda, index) => (
+                        {tiendasNorte.map((tienda, index) => (
                             <div key={tienda.tienda}>
                                 <button onClick={() => setActiveNorteStore(activeNorteStore === tienda.tienda ? null : tienda.tienda)} className="w-full text-left p-3 bg-slate-100 hover:bg-slate-200 rounded-md flex justify-between items-center">
                                     <span className="font-semibold">{tienda.tienda}</span>
@@ -235,6 +280,7 @@ const Dashboard = () => {
                                 {activeNorteStore === tienda.tienda && (
                                     <div className="p-2 border-l-2 border-r-2 border-b-2 rounded-b-md border-slate-200">
                                         <DetailsTable tienda={tienda} />
+                                        {/* CORREGIDO: Se pasa el color dinámico */}
                                         <StoreSummaryChart data={getStoreSummaryData(tienda)} color={COLORS[index % COLORS.length]} />
                                     </div>
                                 )}
@@ -250,7 +296,7 @@ const Dashboard = () => {
                 </button>
                 {showSurList && (
                     <div className="mt-4 space-y-2">
-                        {dashboardData.filter(item => item.zona === "Sur").map((tienda, index) => (
+                        {tiendasSur.map((tienda, index) => (
                              <div key={tienda.tienda}>
                                 <button onClick={() => setActiveSurStore(activeSurStore === tienda.tienda ? null : tienda.tienda)} className="w-full text-left p-3 bg-slate-100 hover:bg-slate-200 rounded-md flex justify-between items-center">
                                     <span className="font-semibold">{tienda.tienda}</span>
@@ -259,6 +305,7 @@ const Dashboard = () => {
                                 {activeSurStore === tienda.tienda && (
                                     <div className="p-2 border-l-2 border-r-2 border-b-2 rounded-b-md border-slate-200">
                                         <DetailsTable tienda={tienda} />
+                                        {/* CORREGIDO: Se pasa el color dinámico */}
                                         <StoreSummaryChart data={getStoreSummaryData(tienda)} color={COLORS[index % COLORS.length]} />
                                     </div>
                                 )}
@@ -274,13 +321,13 @@ const Dashboard = () => {
             </button>
             {showComparisons && (
                 <div className="mt-8">
-                    <div className="text-center mb-8"><h2 className="text-3xl font-bold text-slate-800 mb-2">Comparativa General por Categoría</h2><p className="text-slate-600">Análisis de rendimiento total del mes entre Zona Norte y Zona Sur.</p></div>
+                    <div className="text-center mb-8"><h2 className="text-3xl font-bold text-slate-800 mb-2">Comparativa General por Categoría</h2><p className="text-slate-600">Análisis de rendimiento entre Zona Norte y Zona Sur.</p></div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         <CategoryComparisonChart title="Activaciones" data={categoryComparisonData.activaciones} color="#3B82F6" />
                         <CategoryComparisonChart title="Renovaciones" data={categoryComparisonData.renovaciones} color="#10B981" />
                         <CategoryComparisonChart title="Seguros" data={categoryComparisonData.seguros} color="#F59E0B" />
                         <CategoryComparisonChart title="Simples Empresariales" data={categoryComparisonData.simples} color="#EF4444" />
-                        <CategoryComparisonChart title="Access Fee" data={categoryComparisonData.accessFee} color="#8B5CF6" />
+                        <CategoryComparisonChart title="Promedio Access Fee" data={categoryComparisonData.accessFee} color="#8B5CF6" />
                     </div>
                 </div>
             )}
