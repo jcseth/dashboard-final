@@ -258,7 +258,7 @@ const Dashboard = () => {
           <img 
             src={logoIzquierdo} 
             alt="Logo Izquierdo" 
-            className="h-12" // Puedes ajustar la altura aquí (ej. h-10, h-14)
+            className="h-16" // Puedes ajustar la altura aquí (ej. h-10, h-14)
           />
 
           {/* Título Central */}
@@ -270,7 +270,7 @@ const Dashboard = () => {
           <img 
             src={logoDerecho} 
             alt="Logo Derecho" 
-            className="h-12" // Puedes ajustar la altura aquí
+            className="h-16" // Puedes ajustar la altura aquí
           />
         </header>
 
