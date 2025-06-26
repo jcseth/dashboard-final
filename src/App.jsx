@@ -6,8 +6,6 @@ const Dashboard = () => {
   const [showNorteDetails, setShowNorteDetails] = useState(false);
   const [showSurDetails, setShowSurDetails] = useState(false);
 
-  // --- NUEVA ESTRUCTURA DE DATOS CENTRALIZADA ---
-  // Aquí hemos combinado toda la información de tus 5 tablas.
   const dashboardData = [
     { tienda: "CHEDRAUI EDUARDO MOLINA", zona: "Norte",
       semana1: { nuevas: 12, renovaciones: 8, seguros: 5, simples: 0, access: 676.50 },
@@ -86,8 +84,6 @@ const Dashboard = () => {
     },
   ];
 
-  // --- CÁLCULOS DE TOTALES CORREGIDOS ---
-  // Ahora las tarjetas de resumen suman los datos reales del mes.
   const totales = useMemo(() => {
     const sumReducer = (category) => dashboardData.reduce((sum, item) => 
       sum + item.semana1[category] + item.semana2[category] + item.semana3[category], 0);
@@ -97,12 +93,10 @@ const Dashboard = () => {
       renovaciones: sumReducer('renovaciones'),
       seguros: sumReducer('seguros'),
       simplesEmpresariales: sumReducer('simples'),
-      access: sumReducer('access').toFixed(2)
+      access: 600.96 // <-- CAMBIO 1: Valor fijo como solicitaste
     };
   }, [dashboardData]);
 
-  // --- CÁLCULOS PARA GRÁFICAS CORREGIDOS ---
-  // "Operaciones" ahora es la suma de las 4 categorías. "Ingresos" es Access.
   const dataZonas = useMemo(() => {
     const calculateZoneData = (zona) => {
       const zoneData = dashboardData.filter(item => item.zona === zona);
@@ -127,6 +121,47 @@ const Dashboard = () => {
     (store.semana2.nuevas + store.semana2.renovaciones + store.semana2.seguros + store.semana2.simples) +
     (store.semana3.nuevas + store.semana3.renovaciones + store.semana3.seguros + store.semana3.simples);
 
+  // --- CAMBIO 3: Componente para la nueva tabla de detalles ---
+  const DetailsTable = ({ tienda }) => {
+    const categories = ['nuevas', 'renovaciones', 'seguros', 'simples', 'access'];
+    const categoryNames = {
+      nuevas: 'Nuevas y Ad.',
+      renovaciones: 'Renovaciones',
+      seguros: 'Seguros',
+      simples: 'S. Empresariales',
+      access: 'Access'
+    };
+
+    return (
+      <div className="text-xs sm:text-sm bg-white p-3 rounded-lg border">
+        <div className="grid grid-cols-5 gap-2 font-bold text-center border-b pb-2 mb-2">
+          <div>Categoría</div>
+          <div>Sem 1</div>
+          <div>Sem 2</div>
+          <div>Sem 3</div>
+          <div>Total Mes</div>
+        </div>
+        {categories.map(cat => {
+          const s1 = tienda.semana1[cat];
+          const s2 = tienda.semana2[cat];
+          const s3 = tienda.semana3[cat];
+          const total = s1 + s2 + s3;
+          const isCurrency = cat === 'access';
+
+          return (
+            <div key={cat} className="grid grid-cols-5 gap-2 text-center py-1 even:bg-slate-50">
+              <div className="font-semibold text-left">{categoryNames[cat]}</div>
+              <div>{isCurrency ? formatCurrency(s1) : s1}</div>
+              <div>{isCurrency ? formatCurrency(s2) : s2}</div>
+              <div>{isCurrency ? formatCurrency(s3) : s3}</div>
+              <div className="font-bold">{isCurrency ? formatCurrency(total) : total}</div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
       <div className="max-w-7xl mx-auto">
@@ -136,31 +171,31 @@ const Dashboard = () => {
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-          <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-blue-500">
-            <Users className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-            <h3 className="font-semibold text-slate-700 mb-1">Nuevas y Adiciones</h3>
-            <p className="text-2xl font-bold text-slate-800">{totales.nuevasAdiciones.toLocaleString()}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-green-500">
-            <TrendingUp className="w-8 h-8 text-green-500 mx-auto mb-2" />
-            <h3 className="font-semibold text-slate-700 mb-1">Renovaciones</h3>
-            <p className="text-2xl font-bold text-slate-800">{totales.renovaciones.toLocaleString()}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-yellow-500">
-            <Shield className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-            <h3 className="font-semibold text-slate-700 mb-1">Seguros</h3>
-            <p className="text-2xl font-bold text-slate-800">{totales.seguros.toLocaleString()}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-red-500">
-            <Building className="w-8 h-8 text-red-500 mx-auto mb-2" />
-            <h3 className="font-semibold text-slate-700 mb-1">Simples Empresariales</h3>
-            <p className="text-2xl font-bold text-slate-800">{totales.simplesEmpresariales.toLocaleString()}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-purple-500">
-            <DollarSign className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-            <h3 className="font-semibold text-slate-700 mb-1">Access (Ingresos)</h3>
-            <p className="text-2xl font-bold text-slate-800">{formatCurrency(totales.access)}</p>
-          </div>
+            <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-blue-500">
+                <Users className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+                <h3 className="font-semibold text-slate-700 mb-1">Nuevas y Adiciones</h3>
+                <p className="text-2xl font-bold text-slate-800">{totales.nuevasAdiciones.toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-green-500">
+                <TrendingUp className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                <h3 className="font-semibold text-slate-700 mb-1">Renovaciones</h3>
+                <p className="text-2xl font-bold text-slate-800">{totales.renovaciones.toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-yellow-500">
+                <Shield className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
+                <h3 className="font-semibold text-slate-700 mb-1">Seguros</h3>
+                <p className="text-2xl font-bold text-slate-800">{totales.seguros.toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-red-500">
+                <Building className="w-8 h-8 text-red-500 mx-auto mb-2" />
+                <h3 className="font-semibold text-slate-700 mb-1">Simples Empresariales</h3>
+                <p className="text-2xl font-bold text-slate-800">{totales.simplesEmpresariales.toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-purple-500">
+                <DollarSign className="w-8 h-8 text-purple-500 mx-auto mb-2" />
+                <h3 className="font-semibold text-slate-700 mb-1">Access (Ingresos)</h3>
+                <p className="text-2xl font-bold text-slate-800">{formatCurrency(totales.access)}</p>
+            </div>
         </div>
         
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
@@ -184,20 +219,20 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             <div className="bg-white rounded-xl shadow-lg p-6">
                 <h3 className="text-xl font-bold text-slate-800 mb-4">Operaciones por Tienda (Norte)</h3>
-                <div className="h-64">
+                <div style={{height: 300}}>
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie data={dashboardData.filter(item => item.zona === "Norte")} 
                                  dataKey={getStoreTotalOps} 
                                  nameKey="tienda" 
                                  cx="50%" cy="50%" 
-                                 outerRadius={80} 
+                                 outerRadius={100} 
                                  fill="#8884d8">
                                 {dashboardData.filter(item => item.zona === "Norte").map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
-                            <Tooltip formatter={(value, name) => [value.toLocaleString(), name]}/>
+                            <Tooltip formatter={(value, name) => [value.toLocaleString(), name.split(' ').slice(1).join(' ')]}/>
                             <Legend />
                         </PieChart>
                     </ResponsiveContainer>
@@ -205,20 +240,20 @@ const Dashboard = () => {
             </div>
             <div className="bg-white rounded-xl shadow-lg p-6">
                 <h3 className="text-xl font-bold text-slate-800 mb-4">Operaciones por Tienda (Sur)</h3>
-                <div className="h-64">
+                <div style={{height: 300}}>
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie data={dashboardData.filter(item => item.zona === "Sur")} 
                                  dataKey={getStoreTotalOps} 
                                  nameKey="tienda" 
                                  cx="50%" cy="50%" 
-                                 outerRadius={80} 
+                                 outerRadius={100} 
                                  fill="#8884d8">
                                 {dashboardData.filter(item => item.zona === "Sur").map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
-                            <Tooltip formatter={(value, name) => [value.toLocaleString(), name]}/>
+                            <Tooltip formatter={(value, name) => [value.toLocaleString(), name.split(' ').slice(1).join(' ')]}/>
                             <Legend />
                         </PieChart>
                     </ResponsiveContainer>
@@ -236,15 +271,11 @@ const Dashboard = () => {
                     {showNorteDetails ? <ChevronUp className="w-5 h-5 text-blue-600" /> : <ChevronDown className="w-5 h-5 text-blue-600" />}
                 </button>
                 {showNorteDetails && (
-                    <div className="mt-4 space-y-3">
-                        {dashboardData.filter(item => item.zona === "Norte").map((tienda, index) => (
-                            <div key={index} className="border rounded-lg p-4 bg-slate-50">
+                    <div className="mt-4 space-y-4">
+                        {dashboardData.filter(item => item.zona === "Norte").map((tienda) => (
+                            <div key={tienda.tienda}>
                                 <h4 className="font-semibold text-slate-800 mb-2">{tienda.tienda}</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                                    <p><b>Sem 1:</b> {tienda.semana1.nuevas} N | {tienda.semana1.renovaciones} R | {tienda.semana1.seguros} S | {tienda.semana1.simples} E | <b>{formatCurrency(tienda.semana1.access)}</b></p>
-                                    <p><b>Sem 2:</b> {tienda.semana2.nuevas} N | {tienda.semana2.renovaciones} R | {tienda.semana2.seguros} S | {tienda.semana2.simples} E | <b>{formatCurrency(tienda.semana2.access)}</b></p>
-                                    <p><b>Sem 3:</b> {tienda.semana3.nuevas} N | {tienda.semana3.renovaciones} R | {tienda.semana3.seguros} S | {tienda.semana3.simples} E | <b>{formatCurrency(tienda.semana3.access)}</b></p>
-                                </div>
+                                <DetailsTable tienda={tienda} />
                             </div>
                         ))}
                     </div>
@@ -259,15 +290,11 @@ const Dashboard = () => {
                     {showSurDetails ? <ChevronUp className="w-5 h-5 text-green-600" /> : <ChevronDown className="w-5 h-5 text-green-600" />}
                 </button>
                 {showSurDetails && (
-                    <div className="mt-4 space-y-3">
-                        {dashboardData.filter(item => item.zona === "Sur").map((tienda, index) => (
-                           <div key={index} className="border rounded-lg p-4 bg-slate-50">
+                    <div className="mt-4 space-y-4">
+                        {dashboardData.filter(item => item.zona === "Sur").map((tienda) => (
+                             <div key={tienda.tienda}>
                                 <h4 className="font-semibold text-slate-800 mb-2">{tienda.tienda}</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                                    <p><b>Sem 1:</b> {tienda.semana1.nuevas} N | {tienda.semana1.renovaciones} R | {tienda.semana1.seguros} S | {tienda.semana1.simples} E | <b>{formatCurrency(tienda.semana1.access)}</b></p>
-                                    <p><b>Sem 2:</b> {tienda.semana2.nuevas} N | {tienda.semana2.renovaciones} R | {tienda.semana2.seguros} S | {tienda.semana2.simples} E | <b>{formatCurrency(tienda.semana2.access)}</b></p>
-                                    <p><b>Sem 3:</b> {tienda.semana3.nuevas} N | {tienda.semana3.renovaciones} R | {tienda.semana3.seguros} S | {tienda.semana3.simples} E | <b>{formatCurrency(tienda.semana3.access)}</b></p>
-                                </div>
+                                <DetailsTable tienda={tienda} />
                             </div>
                         ))}
                     </div>
@@ -275,13 +302,13 @@ const Dashboard = () => {
             </div>
         </div>
 
+        {/* --- CAMBIO 2: Pie de página simplificado --- */}
         <div className="text-center mt-8 text-slate-500 text-sm">
-          Dashboard generado automáticamente - Región Centro
+          Región Centro
         </div>
       </div>
     </div>
   );
 };
 
-// La plantilla puede buscar `App` en `main.jsx`, así que nos aseguramos de exportarlo.
 export default Dashboard;
