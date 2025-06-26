@@ -43,7 +43,7 @@ const Dashboard = () => {
   const [activeSurStore, setActiveSurStore] = useState(null);
   const [showComparisons, setShowComparisons] = useState(false);
 
-  // ---> AQUÍ ESTÁN TODAS LAS 15 TIENDAS
+  // ---> AQUÍ ESTÁN TODAS LAS 15 TIENDAS. CÓDIGO COMPLETO.
   const dashboardData = [
     { tienda: "CHEDRAUI EDUARDO MOLINA", zona: "Norte",
       semana1: { activaciones: 12, renovaciones: 8, seguros: 5, simples: 0, accessFee: 676.50 },
@@ -174,7 +174,6 @@ const Dashboard = () => {
           const s2 = tienda.semana2[cat];
           const s3 = tienda.semana3[cat];
           const isCurrency = cat === 'accessFee';
-          // ---> CAMBIO: EL TOTAL DE ACCESS ES PROMEDIO, NO SUMA
           const total = isCurrency ? (s1 + s2 + s3) / 3 : s1 + s2 + s3;
           return (
             <div key={cat} className="grid grid-cols-5 gap-2 text-center py-1 even:bg-slate-50 items-center">
@@ -236,7 +235,6 @@ const Dashboard = () => {
                                 {activeNorteStore === tienda.tienda && (
                                     <div className="p-2 border-l-2 border-r-2 border-b-2 rounded-b-md border-slate-200">
                                         <DetailsTable tienda={tienda} />
-                                        {/* ---> CAMBIO: Colores dinámicos para las gráficas de tienda --- */}
                                         <StoreSummaryChart data={getStoreSummaryData(tienda)} color={COLORS[index % COLORS.length]} />
                                     </div>
                                 )}
