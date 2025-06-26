@@ -10,9 +10,9 @@ const CategoryComparisonChart = ({ title, data, color }) => (
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis type="number" />
-          <YAxis type="category" dataKey="zona" width={50} />
-          <Tooltip cursor={{fill: '#f0f0f0'}} formatter={(value) => value.toLocaleString()} />
+          <XAxis type="number" tickFormatter={(value) => value.toLocaleString('es-MX', {notation: 'compact'})} />
+          <YAxis type="category" dataKey="zona" width={60} />
+          <Tooltip cursor={{fill: '#f0f0f0'}} formatter={(value) => value.toLocaleString('es-MX', {maximumFractionDigits: 2})} />
           <Bar dataKey="total" fill={color} name="Total" barSize={40} />
         </BarChart>
       </ResponsiveContainer>
@@ -43,7 +43,6 @@ const Dashboard = () => {
   const [activeSurStore, setActiveSurStore] = useState(null);
   const [showComparisons, setShowComparisons] = useState(false);
 
-  // ---> AQUÍ ESTÁN TODAS LAS 15 TIENDAS. CÓDIGO COMPLETO.
   const dashboardData = [
     { tienda: "CHEDRAUI EDUARDO MOLINA", zona: "Norte",
       semana1: { activaciones: 12, renovaciones: 8, seguros: 5, simples: 0, accessFee: 676.50 },
@@ -122,82 +121,77 @@ const Dashboard = () => {
     },
   ];
 
-  const totales = useMemo(() => {
-    const sumReducer = (category) => dashboardData.reduce((sum, item) => sum + (item.semana1?.[category] || 0) + (item.semana2?.[category] || 0) + (item.semana3?.[category] || 0), 0);
-    
-    let totalAccessFeeSum = 0;
-    let accessFeeCount = 0;
-    
-    dashboardData.forEach(item => {
+  const safeSumReducer = (data, category) => {
+    return data.reduce((sum, item) => {
+        const s1 = item.semana1?.[category] ?? 0;
+        const s2 = item.semana2?.[category] ?? 0;
+        const s3 = item.semana3?.[category] ?? 0;
+        return sum + s1 + s2 + s3;
+    }, 0);
+  };
+
+  const safeAverageReducer = (data, category) => {
+    let totalSum = 0;
+    let count = 0;
+    data.forEach(item => {
         ['semana1', 'semana2', 'semana3'].forEach(semana => {
-            if (item[semana]?.accessFee) {
-                totalAccessFeeSum += item[semana].accessFee;
-                accessFeeCount++;
+            const value = item[semana]?.[category];
+            if (typeof value === 'number') {
+                totalSum += value;
+                count++;
             }
         });
     });
+    return count > 0 ? totalSum / count : 0;
+  };
 
-    const averageTotalAccessFee = accessFeeCount > 0 ? totalAccessFeeSum / accessFeeCount : 0;
-
+  const totales = useMemo(() => {
     return {
-      totalActivaciones: sumReducer('activaciones'),
-      totalRenovaciones: sumReducer('renovaciones'),
-      totalSeguros: sumReducer('seguros'),
-      totalSimples: sumReducer('simples'),
-      totalAccessFee: averageTotalAccessFee, // <-- CORREGIDO: Promedio en lugar de estático
+      totalActivaciones: safeSumReducer(dashboardData, 'activaciones'),
+      totalRenovaciones: safeSumReducer(dashboardData, 'renovaciones'),
+      totalSeguros: safeSumReducer(dashboardData, 'seguros'),
+      totalSimples: safeSumReducer(dashboardData, 'simples'),
+      totalAccessFee: safeAverageReducer(dashboardData, 'accessFee'),
     };
   }, [dashboardData]);
   
   const zoneSummaryData = useMemo(() => {
-    const metrics = [
-      { key: 'activaciones', name: 'Activaciones' },
-      { key: 'renovaciones', name: 'Renovaciones' },
-      { key: 'seguros', name: 'Seguros' },
-      { key: 'simples', name: 'Simples Emp.' },
-    ];
+    const metrics = ['activaciones', 'renovaciones', 'seguros', 'simples'];
+    const metricNames = { activaciones: 'Activaciones', renovaciones: 'Renovaciones', seguros: 'Seguros', simples: 'Simples Emp.' };
+    
     const calculateTotals = (zona) => {
-      return metrics.map(metric => {
-        const total = dashboardData.filter(d => d.zona === zona).reduce((sum, item) => sum + (item.semana1?.[metric.key] || 0) + (item.semana2?.[metric.key] || 0) + (item.semana3?.[metric.key] || 0), 0);
-        return { metric: metric.name, total };
-      });
+      const filteredData = dashboardData.filter(d => d.zona === zona);
+      return metrics.map(metric => ({
+        metric: metricNames[metric],
+        total: safeSumReducer(filteredData, metric)
+      }));
     };
     return { norte: calculateTotals('Norte'), sur: calculateTotals('Sur') };
   }, [dashboardData]);
 
   const categoryComparisonData = useMemo(() => {
-    const getZoneTotal = (zona, category) => dashboardData.filter(item => item.zona === zona).reduce((sum, item) => sum + (item.semana1?.[category] || 0) + (item.semana2?.[category] || 0) + (item.semana3?.[category] || 0), 0);
-    
-    const getZoneAverage = (zona, category) => {
-        const storesInZone = dashboardData.filter(item => item.zona === zona);
-        let totalSum = 0;
-        let count = 0;
-        storesInZone.forEach(item => {
-            ['semana1', 'semana2', 'semana3'].forEach(semana => {
-                if(item[semana]?.[category]){
-                    totalSum += item[semana][category];
-                    count++;
-                }
-            });
-        });
-        return count > 0 ? totalSum / count : 0;
-    }
-
     const categories = ['activaciones', 'renovaciones', 'seguros', 'simples'];
     const result = categories.reduce((acc, category) => {
-      acc[category] = [{ zona: 'Norte', total: getZoneTotal('Norte', category) }, { zona: 'Sur', total: getZoneTotal('Sur', category) }];
+      const norteData = dashboardData.filter(item => item.zona === 'Norte');
+      const surData = dashboardData.filter(item => item.zona === 'Sur');
+      acc[category] = [
+        { zona: 'Norte', total: safeSumReducer(norteData, category) },
+        { zona: 'Sur', total: safeSumReducer(surData, category) }
+      ];
       return acc;
     }, {});
-
-    // Cálculo especial para Access Fee (promedio)
+    
+    const norteData = dashboardData.filter(item => item.zona === 'Norte');
+    const surData = dashboardData.filter(item => item.zona === 'Sur');
     result['accessFee'] = [
-        { zona: 'Norte', total: getZoneAverage('Norte', 'accessFee') },
-        { zona: 'Sur', total: getZoneAverage('Sur', 'accessFee') }
+        { zona: 'Norte', total: safeAverageReducer(norteData, 'accessFee') },
+        { zona: 'Sur', total: safeAverageReducer(surData, 'accessFee') }
     ];
 
     return result;
   }, [dashboardData]);
 
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#6366F1', '#EC4899'];
+  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#6366F1', '#EC4899', '#F97316', '#14B8A6'];
   const formatCurrency = (value) => `$${parseFloat(value).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const DetailsTable = ({ tienda }) => {
@@ -209,11 +203,10 @@ const Dashboard = () => {
           <div>Categoría</div><div>Sem 1</div><div>Sem 2</div><div>Sem 3</div><div>Total Mes</div>
         </div>
         {categories.map(cat => {
-          const s1 = tienda.semana1?.[cat] || 0;
-          const s2 = tienda.semana2?.[cat] || 0;
-          const s3 = tienda.semana3?.[cat] || 0;
+          const s1 = tienda.semana1?.[cat] ?? 0;
+          const s2 = tienda.semana2?.[cat] ?? 0;
+          const s3 = tienda.semana3?.[cat] ?? 0;
           const isCurrency = cat === 'accessFee';
-          // CORREGIDO: El total de Access Fee es el promedio, los demás son suma.
           const total = isCurrency ? (s1 + s2 + s3) / 3 : s1 + s2 + s3;
           return (
             <div key={cat} className="grid grid-cols-5 gap-2 text-center py-1 even:bg-slate-50 items-center">
@@ -232,15 +225,17 @@ const Dashboard = () => {
   const getStoreSummaryData = (tienda) => {
     const metrics = [{ key: 'activaciones', name: 'Activaciones' }, { key: 'renovaciones', name: 'Renovaciones' }, { key: 'seguros', name: 'Seguros' }, { key: 'simples', name: 'Simples Emp.' }, { key: 'accessFee', name: 'Access Fee' }];
     return metrics.map(metric => {
-      const totalSum = (tienda.semana1?.[metric.key] || 0) + (tienda.semana2?.[metric.key] || 0) + (tienda.semana3?.[metric.key] || 0);
-      // CORREGIDO: Si es accessFee, promedia. Si no, suma.
-      const value = metric.key === 'accessFee' ? parseFloat((totalSum / 3).toFixed(2)) : totalSum;
+      const s1 = tienda.semana1?.[metric.key] ?? 0;
+      const s2 = tienda.semana2?.[metric.key] ?? 0;
+      const s3 = tienda.semana3?.[metric.key] ?? 0;
+      const totalSum = s1 + s2 + s3;
+      const value = metric.key === 'accessFee' ? (totalSum / 3) : totalSum;
       return { metric: metric.name, total: value };
     });
   };
 
-  const tiendasNorte = dashboardData.filter(item => item.zona === "Norte");
-  const tiendasSur = dashboardData.filter(item => item.zona === "Sur");
+  const tiendasNorte = useMemo(() => dashboardData.filter(item => item.zona === "Norte"), [dashboardData]);
+  const tiendasSur = useMemo(() => dashboardData.filter(item => item.zona === "Sur"), [dashboardData]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
@@ -280,7 +275,6 @@ const Dashboard = () => {
                                 {activeNorteStore === tienda.tienda && (
                                     <div className="p-2 border-l-2 border-r-2 border-b-2 rounded-b-md border-slate-200">
                                         <DetailsTable tienda={tienda} />
-                                        {/* CORREGIDO: Se pasa el color dinámico */}
                                         <StoreSummaryChart data={getStoreSummaryData(tienda)} color={COLORS[index % COLORS.length]} />
                                     </div>
                                 )}
@@ -305,7 +299,6 @@ const Dashboard = () => {
                                 {activeSurStore === tienda.tienda && (
                                     <div className="p-2 border-l-2 border-r-2 border-b-2 rounded-b-md border-slate-200">
                                         <DetailsTable tienda={tienda} />
-                                        {/* CORREGIDO: Se pasa el color dinámico */}
                                         <StoreSummaryChart data={getStoreSummaryData(tienda)} color={COLORS[index % COLORS.length]} />
                                     </div>
                                 )}
