@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ChevronDown, ChevronUp, Store, TrendingUp, DollarSign, Users, Shield, Building } from 'lucide-react';
 
-// --- Componente Reutilizable para las nuevas gráficas de comparación ---
+// --- Componente Reutilizable para las gráficas de comparación ---
 const CategoryComparisonChart = ({ title, data, color }) => (
   <div className="bg-white rounded-xl shadow-lg p-6">
     <h3 className="text-xl font-bold text-slate-800 mb-4">{title}</h3>
@@ -20,10 +20,11 @@ const CategoryComparisonChart = ({ title, data, color }) => (
   </div>
 );
 
-
 const Dashboard = () => {
   const [showNorteDetails, setShowNorteDetails] = useState(false);
   const [showSurDetails, setShowSurDetails] = useState(false);
+  // --- NUEVO ESTADO para la sección de comparativas ---
+  const [showComparisons, setShowComparisons] = useState(false);
 
   const dashboardData = [
     { tienda: "CHEDRAUI EDUARDO MOLINA", zona: "Norte",
@@ -115,24 +116,7 @@ const Dashboard = () => {
       access: 600.96
     };
   }, [dashboardData]);
-
-  const dataZonas = useMemo(() => {
-    const calculateZoneData = (zona) => {
-      const zoneData = dashboardData.filter(item => item.zona === zona);
-      const operaciones = zoneData.reduce((sum, item) =>
-        sum + 
-        (item.semana1.nuevas + item.semana1.renovaciones + item.semana1.seguros + item.semana1.simples) +
-        (item.semana2.nuevas + item.semana2.renovaciones + item.semana2.seguros + item.semana2.simples) +
-        (item.semana3.nuevas + item.semana3.renovaciones + item.semana3.seguros + item.semana3.simples),
-      0);
-      const ingresos = zoneData.reduce((sum, item) =>
-        sum + item.semana1.access + item.semana2.access + item.semana3.access, 0);
-      return { zona, operaciones, ingresos };
-    };
-    return [calculateZoneData("Norte"), calculateZoneData("Sur")];
-  }, [dashboardData]);
   
-  // --- Datos para las nuevas gráficas de comparación ---
   const categoryComparisonData = useMemo(() => {
     const getZoneTotal = (zona, category) => 
       dashboardData.filter(item => item.zona === zona)
@@ -143,6 +127,7 @@ const Dashboard = () => {
       renovaciones: [{ zona: 'Norte', total: getZoneTotal('Norte', 'renovaciones') }, { zona: 'Sur', total: getZoneTotal('Sur', 'renovaciones') }],
       seguros: [{ zona: 'Norte', total: getZoneTotal('Norte', 'seguros') }, { zona: 'Sur', total: getZoneTotal('Sur', 'seguros') }],
       simples: [{ zona: 'Norte', total: getZoneTotal('Norte', 'simples') }, { zona: 'Sur', total: getZoneTotal('Sur', 'simples') }],
+      access: [{ zona: 'Norte', total: getZoneTotal('Norte', 'access') }, { zona: 'Sur', total: getZoneTotal('Sur', 'access') }],
     }
   }, [dashboardData]);
 
@@ -154,7 +139,7 @@ const Dashboard = () => {
       nuevas: 'Nuevas y Ad.',
       renovaciones: 'Renovaciones',
       seguros: 'Seguros',
-      simples: 'Simples Emp.', // <-- CAMBIO 2: Abreviatura para que quepa bien
+      simples: 'Simples Emp.',
       access: 'Access'
     };
 
@@ -172,7 +157,6 @@ const Dashboard = () => {
           const s2 = tienda.semana2[cat];
           const s3 = tienda.semana3[cat];
           const isCurrency = cat === 'access';
-          // <-- CAMBIO 3: El total de Access ahora es promedio
           const total = isCurrency ? (s1 + s2 + s3) / 3 : s1 + s2 + s3;
 
           return (
@@ -220,43 +204,12 @@ const Dashboard = () => {
             </div>
             <div className="bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-purple-500">
                 <DollarSign className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-                {/* <-- CAMBIO 1: Título de la tarjeta corregido --> */}
                 <h3 className="font-semibold text-slate-700 mb-1">Access</h3>
                 <p className="text-2xl font-bold text-slate-800">{formatCurrency(totales.access)}</p>
             </div>
         </div>
         
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <h2 className="text-2xl font-bold text-slate-800 mb-4">Resumen General por Zona</h2>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dataZonas}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="zona" />
-                <YAxis yAxisId="left" label={{ value: 'Operaciones', angle: -90, position: 'insideLeft' }} orientation="left" stroke="#3B82F6" />
-                <YAxis yAxisId="right" label={{ value: 'Ingresos ($)', angle: -90, position: 'insideRight' }} orientation="right" stroke="#10B981" tickFormatter={value => `$${(value/1000).toFixed(0)}k`} />
-                <Tooltip formatter={(value, name) => name === 'operaciones' ? value.toLocaleString() : formatCurrency(value)} />
-                <Legend />
-                <Bar yAxisId="left" dataKey="operaciones" fill="#3B82F6" name="Operaciones" />
-                <Bar yAxisId="right" dataKey="ingresos" fill="#10B981" name="Ingresos" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        
-        {/* --- CAMBIO 5: Nuevas gráficas comparativas por categoría --- */}
-        <div className="text-center mb-8 mt-12">
-            <h2 className="text-3xl font-bold text-slate-800 mb-2">Comparativa por Categoría</h2>
-            <p className="text-slate-600">Análisis de rendimiento entre Zona Norte y Zona Sur.</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            <CategoryComparisonChart title="Nuevas y Adiciones" data={categoryComparisonData.nuevas} color="#3B82F6" />
-            <CategoryComparisonChart title="Renovaciones" data={categoryComparisonData.renovaciones} color="#10B981" />
-            <CategoryComparisonChart title="Seguros" data={categoryComparisonData.seguros} color="#F59E0B" />
-            <CategoryComparisonChart title="Simples Empresariales" data={categoryComparisonData.simples} color="#EF4444" />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
             <div className="bg-white rounded-xl shadow-lg p-6">
                 <button onClick={() => setShowNorteDetails(!showNorteDetails)} className="w-full flex items-center justify-between p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
                     <div className="flex items-center">
@@ -296,8 +249,35 @@ const Dashboard = () => {
                 )}
             </div>
         </div>
+        
+        {/* --- NUEVA SECCIÓN RETRÁCTIL DE COMPARATIVAS --- */}
+        <div className="mb-8">
+            <button
+                onClick={() => setShowComparisons(!showComparisons)}
+                className="w-full p-2 bg-slate-200 hover:bg-slate-300 rounded-lg transition-colors flex justify-center items-center"
+                aria-label="Mostrar/Ocultar comparativas por zona"
+            >
+                {showComparisons ? <ChevronUp className="w-6 h-6 text-slate-600" /> : <ChevronDown className="w-6 h-6 text-slate-600" />}
+            </button>
 
-        {/* --- CAMBIO 4: Pie de página eliminado --- */}
+            {showComparisons && (
+                <div className="mt-8">
+                    <div className="text-center mb-8">
+                        <h2 className="text-3xl font-bold text-slate-800 mb-2">Comparativa por Zona y Categoría</h2>
+                        <p className="text-slate-600">Análisis de rendimiento total del mes entre Zona Norte y Zona Sur.</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <CategoryComparisonChart title="Nuevas y Adiciones" data={categoryComparisonData.nuevas} color="#3B82F6" />
+                        <CategoryComparisonChart title="Renovaciones" data={categoryComparisonData.renovaciones} color="#10B981" />
+                        <CategoryComparisonChart title="Seguros" data={categoryComparisonData.seguros} color="#F59E0B" />
+                        <CategoryComparisonChart title="Simples Empresariales" data={categoryComparisonData.simples} color="#EF4444" />
+                        <CategoryComparisonChart title="Access (Ingresos)" data={categoryComparisonData.access} color="#8B5CF6" />
+                    </div>
+
+                </div>
+            )}
+        </div>
+
       </div>
     </div>
   );
