@@ -5,7 +5,12 @@ module.exports = {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      // Objeto añadido para registrar la nueva fuente
+      fontFamily: {
+        elegant: ['"Playfair Display"', 'serif'],
+      },
+    },
   },
   plugins: [],
 }
