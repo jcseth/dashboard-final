@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Users, TrendingUp, DollarSign, ChevronDown, ChevronUp } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, ChevronDown, ChevronUp, ClipboardList } from 'lucide-react';
 
 const CardBackDetails = ({ title, data }) => {
   const formatKey = (key) => key.replace(/([A-Z])/g, ' $1').trim();
@@ -45,7 +45,6 @@ const PtoVentaChart = ({ data, color }) => {
   );
 };
 
-
 const EmpresarialDashboard = () => {
   const [data, setData] = useState(null);
   const [flippedCards, setFlippedCards] = useState({});
@@ -83,40 +82,55 @@ const EmpresarialDashboard = () => {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-12 [perspective:1000px]">
-
-        <div className="relative w-full h-40 cursor-pointer transition-transform duration-700 [transform-style:preserve-3d]" style={{ transform: flippedCards['activaciones'] ? 'rotateY(180deg)' : 'rotateY(0deg)' }} onClick={() => handleCardFlip('activaciones')}>
-          <div className="absolute w-full h-full bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-blue-500 [backface-visibility:hidden] flex flex-col justify-center">
-            <Users className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-            <h3 className="font-semibold text-slate-700 mb-1">Activaciones</h3>
-            <p className="text-2xl font-bold text-slate-800">{(data.totalActivaciones || 0).toLocaleString()}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 [perspective:1000px]">
+        
+        {/* --- Tarjeta Giratoria: Activaciones con Cuota --- */}
+        <div className="relative w-full h-48 cursor-pointer transition-transform duration-700 [transform-style:preserve-3d]" style={{ transform: flippedCards['activaciones'] ? 'rotateY(180deg)' : 'rotateY(0deg)' }} onClick={() => handleCardFlip('activaciones')}>
+          <div className="absolute w-full h-full bg-white rounded-xl shadow-lg p-4 border-l-4 border-blue-500 [backface-visibility:hidden] flex flex-col justify-between">
+            <div className="flex items-start justify-between"><h3 className="font-semibold text-slate-700 text-base">Activaciones</h3><Users className="w-8 h-8 text-blue-500" /></div>
+            <div><p className="text-2xl font-bold text-slate-800">{(data.totalActivaciones?.actual || 0).toLocaleString()}</p><p className="text-xs text-slate-500">de {(data.totalActivaciones?.cuota || 0).toLocaleString()}</p></div>
+            <div><div className="flex justify-between items-center mb-1"><span className="text-xs font-semibold text-slate-600">Alcance</span><span className="text-xs font-bold text-blue-500">{Math.round((data.totalActivaciones?.alcance || 0) * 100)}%</span></div><div className="w-full bg-slate-200 rounded-full h-2.5"><div className="bg-blue-500 h-2.5 rounded-full" style={{ width: `${Math.min(Math.round((data.totalActivaciones?.alcance || 0) * 100), 100)}%` }}></div></div></div>
           </div>
-          <div className="absolute w-full h-full bg-slate-800 text-white rounded-xl shadow-lg [transform:rotateY(180deg)] [backface-visibility:hidden] flex items-center justify-center">
+          <div className="absolute w-full h-full bg-slate-800 text-white rounded-xl shadow-lg [transform:rotateY(180deg)] [backface-visibility:hidden]">
             <CardBackDetails title="Detalle Activaciones" data={data.detalleActivaciones || {}} />
           </div>
         </div>
 
-        <div className="relative w-full h-40 cursor-pointer transition-transform duration-700 [transform-style:preserve-3d]" style={{ transform: flippedCards['renovaciones'] ? 'rotateY(180deg)' : 'rotateY(0deg)' }} onClick={() => handleCardFlip('renovaciones')}>
-          <div className="absolute w-full h-full bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-green-500 [backface-visibility:hidden] flex flex-col justify-center">
-            <TrendingUp className="w-8 h-8 text-green-500 mx-auto mb-2" />
-            <h3 className="font-semibold text-slate-700 mb-1">Renovaciones</h3>
-            <p className="text-2xl font-bold text-slate-800">{(data.totalRenovaciones || 0).toLocaleString()}</p>
+        {/* --- Tarjeta Giratoria: Renovaciones con Cuota --- */}
+        <div className="relative w-full h-48 cursor-pointer transition-transform duration-700 [transform-style:preserve-3d]" style={{ transform: flippedCards['renovaciones'] ? 'rotateY(180deg)' : 'rotateY(0deg)' }} onClick={() => handleCardFlip('renovaciones')}>
+          <div className="absolute w-full h-full bg-white rounded-xl shadow-lg p-4 border-l-4 border-green-500 [backface-visibility:hidden] flex flex-col justify-between">
+            <div className="flex items-start justify-between"><h3 className="font-semibold text-slate-700 text-base">Renovaciones</h3><TrendingUp className="w-8 h-8 text-green-500" /></div>
+            <div><p className="text-2xl font-bold text-slate-800">{(data.totalRenovaciones?.actual || 0).toLocaleString()}</p><p className="text-xs text-slate-500">de {(data.totalRenovaciones?.cuota || 0).toLocaleString()}</p></div>
+            <div><div className="flex justify-between items-center mb-1"><span className="text-xs font-semibold text-slate-600">Alcance</span><span className="text-xs font-bold text-green-500">{Math.round((data.totalRenovaciones?.alcance || 0) * 100)}%</span></div><div className="w-full bg-slate-200 rounded-full h-2.5"><div className="bg-green-500 h-2.5 rounded-full" style={{ width: `${Math.min(Math.round((data.totalRenovaciones?.alcance || 0) * 100), 100)}%` }}></div></div></div>
           </div>
-          <div className="absolute w-full h-full bg-slate-800 text-white rounded-xl shadow-lg [transform:rotateY(180deg)] [backface-visibility:hidden] flex items-center justify-center">
+          <div className="absolute w-full h-full bg-slate-800 text-white rounded-xl shadow-lg [transform:rotateY(180deg)] [backface-visibility:hidden]">
             <CardBackDetails title="Detalle Renovaciones" data={data.detalleRenovaciones || {}} />
           </div>
         </div>
 
-        <div className="relative w-full h-40 cursor-pointer transition-transform duration-700 [transform-style:preserve-3d]" style={{ transform: flippedCards['accessFee'] ? 'rotateY(180deg)' : 'rotateY(0deg)' }} onClick={() => handleCardFlip('accessFee')}>
+        {/* --- NUEVA Tarjeta Giratoria: Mix con Cuota --- */}
+        <div className="relative w-full h-48 cursor-pointer transition-transform duration-700 [transform-style:preserve-3d]" style={{ transform: flippedCards['mix'] ? 'rotateY(180deg)' : 'rotateY(0deg)' }} onClick={() => handleCardFlip('mix')}>
+          <div className="absolute w-full h-full bg-white rounded-xl shadow-lg p-4 border-l-4 border-orange-500 [backface-visibility:hidden] flex flex-col justify-between">
+            <div className="flex items-start justify-between"><h3 className="font-semibold text-slate-700 text-base">Mix</h3><ClipboardList className="w-8 h-8 text-orange-500" /></div>
+            <div><p className="text-2xl font-bold text-slate-800">{(data.totalMix?.actual || 0).toLocaleString()}</p><p className="text-xs text-slate-500">de {(data.totalMix?.cuota || 0).toLocaleString()}</p></div>
+            <div><div className="flex justify-between items-center mb-1"><span className="text-xs font-semibold text-slate-600">Alcance</span><span className="text-xs font-bold text-orange-500">{Math.round((data.totalMix?.alcance || 0) * 100)}%</span></div><div className="w-full bg-slate-200 rounded-full h-2.5"><div className="bg-orange-500 h-2.5 rounded-full" style={{ width: `${Math.min(Math.round((data.totalMix?.alcance || 0) * 100), 100)}%` }}></div></div></div>
+          </div>
+          <div className="absolute w-full h-full bg-slate-800 text-white rounded-xl shadow-lg [transform:rotateY(180deg)] [backface-visibility:hidden]">
+            <CardBackDetails title="Detalle del Mix" data={data.detalleMix || {}} />
+          </div>
+        </div>
+
+        {/* --- Tarjeta Giratoria: Access Fee --- */}
+        <div className="relative w-full h-48 cursor-pointer transition-transform duration-700 [transform-style:preserve-3d]" style={{ transform: flippedCards['accessFee'] ? 'rotateY(180deg)' : 'rotateY(0deg)' }} onClick={() => handleCardFlip('accessFee')}>
           <div className="absolute w-full h-full bg-white rounded-xl shadow-lg p-6 text-center border-l-4 border-purple-500 [backface-visibility:hidden] flex flex-col justify-center">
             <DollarSign className="w-8 h-8 text-purple-500 mx-auto mb-2" />
             <h3 className="font-semibold text-slate-700 mb-1">Access Fee</h3>
             <p className="text-2xl font-bold text-slate-800">{formatCurrency(data.promedioAccessFeeGeneral)}</p>
           </div>
           <div className="absolute w-full h-full bg-slate-800 text-white rounded-xl shadow-lg [transform:rotateY(180deg)] [backface-visibility:hidden] flex items-center justify-center">
-            <CardBackDetails title="Access Fee Promedio" data={{
-              'Activación': formatCurrency(data.promedioAccessFeeActivacion),
-              'Renovación': formatCurrency(data.promedioAccessFeeRenovacion)
+            <CardBackDetails title="Access Fee Promedio" data={{ 
+                'Activación': formatCurrency(data.promedioAccessFeeActivacion), 
+                'Renovación': formatCurrency(data.promedioAccessFeeRenovacion) 
             }} />
           </div>
         </div>
@@ -150,7 +164,7 @@ const EmpresarialDashboard = () => {
                 <XAxis dataKey="ptoVenta" angle={-60} textAnchor="end" interval={0} style={{ fontSize: '10px' }} />
                 <YAxis />
                 <Tooltip />
-                <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '20px' }} />
+                <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '20px' }}/>
                 <Bar dataKey="activaciones" stackId="a" fill="#3B82F6" name="Activaciones" />
                 <Bar dataKey="renovaciones" stackId="a" fill="#10B981" name="Renovaciones" />
               </BarChart>
