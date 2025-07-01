@@ -1,174 +1,259 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
+import { UploadCloud, CheckCircle, AlertCircle, BarChart2 } from 'lucide-react';
 
-const procesadorDeDatos = (datosCrudos) => {
-  // --- Funciones de limpieza y normalización ---
-  const limpiarTexto = (texto) => {
-    if (typeof texto !== 'string') return '';
-    return texto.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  };
-
+const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
+  // --- FUNCIONES DE AYUDA ---
+  const limpiarTexto = (texto) => (texto || '').toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const limpiarNumero = (valor) => {
     if (typeof valor === 'number') return valor;
     if (typeof valor === 'string') {
-      const numero = parseFloat(valor.replace(/,/g, ''));
+      const numero = parseFloat(String(valor).replace(/,/g, ''));
       return isNaN(numero) ? 0 : numero;
     }
     return 0;
   };
-
-  // 1. FILTRO MAESTRO UNIFICADO
-  const datosActivos = datosCrudos.filter(fila => limpiarTexto(fila.ESTATUS) === 'terminada');
-  const datosBaseTiendasPropias = datosActivos.filter(fila =>
-    limpiarTexto(fila.REGION) === '1.-centro-cdmx' &&
-    limpiarTexto(fila['OPERACION PDV'])?.startsWith('t. propias')
-  );
-
-  // --- Lógica de Zonas ---
-  const tiendasZonaNorte = [
-    'chedraui eduardo molina', 'exp chedraui anfora', 'exp cosmopol 2',
-    'exp ksk patio texcoco', 'exp naucalpan', 'exp tda cdmx multiplaza aragon',
-    'exp town center nicolas romero dfn'
-  ].map(limpiarTexto);
-
-  const filasNorte = datosBaseTiendasPropias.filter(fila => tiendasZonaNorte.includes(limpiarTexto(fila['PTO. DE VENTA'])));
-  const filasSur = datosBaseTiendasPropias.filter(fila => !tiendasZonaNorte.includes(limpiarTexto(fila['PTO. DE VENTA'])));
-
-  const calcularMetricas = (datos) => {
-    const masivo = datos.filter(f => limpiarTexto(f['CATEGORIA DE VENTA']) === 'masivo');
-    const empresarial = datos.filter(f => limpiarTexto(f['CATEGORIA DE VENTA']) === 'empresarial');
-    const activaciones = masivo.filter(f => limpiarTexto(f.EVENTO) === 'activacion').length;
-    const renovaciones = masivo.filter(f => limpiarTexto(f.EVENTO) === 'renovacion').length;
-    const seguros = masivo.filter(f => f['SEGURO CAPTURADO']).length;
-    const totalEmpresariales = empresarial.length;
-    return [
-      { metric: 'Activaciones', total: activaciones },
-      { metric: 'Renovaciones', total: renovaciones },
-      { metric: 'Seguros', total: seguros },
-      { metric: 'Empresarial', total: totalEmpresariales },
-    ];
+  const calcularPromedio = (datos, columna) => {
+    const valores = (datos || []).map(fila => limpiarNumero(fila[columna])).filter(val => val > 0);
+    if (valores.length === 0) return 0;
+    return valores.reduce((acc, val) => acc + val, 0) / valores.length;
+  };
+  const calcularAlcance = (real, cuota) => (cuota > 0 ? real / cuota : 0);
+  const getCustomWeek = (date) => {
+    try {
+      let fechaValida;
+      if (typeof date === 'number') { fechaValida = new Date((date - 25569) * 86400 * 1000); }
+      else { fechaValida = new Date(date); }
+      if (isNaN(fechaValida.getTime())) return null;
+      const dayOfMonth = fechaValida.getDate();
+      if (dayOfMonth <= 7) return 'semana1';
+      if (dayOfMonth <= 14) return 'semana2';
+      if (dayOfMonth <= 21) return 'semana3';
+      return 'semana4';
+    } catch { return null; }
   };
 
-  const resumenPorZona = { norte: calcularMetricas(filasNorte), sur: calcularMetricas(filasSur) };
+  // --- FILTRADO INICIAL ---
+  const mesSeleccionadoLimpio = limpiarTexto(mesSeleccionado);
+  const datosDelMes = (datosCrudos || []).filter(fila => limpiarTexto(fila['MES FACTURACION']) === mesSeleccionadoLimpio);
+  const datosActivos = (datosDelMes || []).filter(fila => limpiarTexto(fila.ESTATUS) === 'terminada');
+  const cuotasDelMes = (datosCuotas || []).filter(c => limpiarTexto(c.MES) === mesSeleccionadoLimpio);
 
-  // --- Cálculos Globales ---
-  const datosMasivos = datosBaseTiendasPropias.filter(fila => limpiarTexto(fila['CATEGORIA DE VENTA']) === 'masivo');
-  const activacionesMasivo = datosMasivos.filter(fila => limpiarTexto(fila.EVENTO) === 'activacion');
-  const renovacionesMasivo = datosMasivos.filter(fila => limpiarTexto(fila.EVENTO) === 'renovacion');
+  // --- LÓGICA RESTAURADA Y COMPLETA PARA MASIVO ---
+  const procesarDatosMasivo = () => {
+    const datosBaseTiendasPropias = datosActivos.filter(fila => limpiarTexto(fila.REGION) === '1.-centro-cdmx' && limpiarTexto(fila['OPERACION PDV'])?.startsWith('t. propias'));
+    const tiendasProcesadas = {};
 
-  const totalActivaciones = activacionesMasivo.length;
-  const detalleActivaciones = { 'Simple': activacionesMasivo.filter(fila => limpiarTexto(fila.FAMILIA) === 'simple').length, 'Simple Plus': activacionesMasivo.filter(fila => limpiarTexto(fila.FAMILIA) === 'simple plus').length };
-  const totalRenovaciones = renovacionesMasivo.length;
-  const seguros = datosMasivos.filter(fila => fila['SEGURO CAPTURADO']);
-  const totalSeguros = seguros.length;
+    cuotasDelMes.forEach(cuotaFila => {
+      const nombreTiendaOriginal = cuotaFila['PTO. DE VENTA'];
+      const nombreTiendaLimpio = limpiarTexto(nombreTiendaOriginal);
+      if (!nombreTiendaLimpio) return;
+      tiendasProcesadas[nombreTiendaLimpio] = {
+        nombre: nombreTiendaOriginal,
+        zona: limpiarTexto(cuotaFila.ZONA),
+        cuotas: { activaciones: limpiarNumero(cuotaFila['Cuota Activaciones']), renovaciones: limpiarNumero(cuotaFila['Cuota Renovaciones']), seguros: limpiarNumero(cuotaFila['Cuota Seguros']), empresarial: limpiarNumero(cuotaFila['Cuota Empresarial']) },
+        semanas: { semana1: { activaciones: 0, renovaciones: 0, seguros: 0, empresarial: 0, accessFee: 0, accessFeeCount: 0 }, semana2: { activaciones: 0, renovaciones: 0, seguros: 0, empresarial: 0, accessFee: 0, accessFeeCount: 0 }, semana3: { activaciones: 0, renovaciones: 0, seguros: 0, empresarial: 0, accessFee: 0, accessFeeCount: 0 }, semana4: { activaciones: 0, renovaciones: 0, seguros: 0, empresarial: 0, accessFee: 0, accessFeeCount: 0 } }
+      };
+    });
 
-  const calcularPromedio = (datos, columna) => { const valores = datos.map(fila => limpiarNumero(fila[columna])).filter(val => val > 0); if (valores.length === 0) return 0; const suma = valores.reduce((acc, val) => acc + val, 0); return suma / valores.length; };
+    const datosMasivos = datosBaseTiendasPropias.filter(f => limpiarTexto(f['CATEGORIA DE VENTA']) === 'masivo');
+    const datosEmpresariales = datosBaseTiendasPropias.filter(f => limpiarTexto(f['CATEGORIA DE VENTA']) === 'empresarial');
 
-  // Promedio General para la tarjeta principal (Activaciones + Renovaciones)
-  const activacionesYRenovacionesMasivo = [...activacionesMasivo, ...renovacionesMasivo];
-  const promedioAccessFeeGeneral = calcularPromedio(activacionesYRenovacionesMasivo, 'RENTA SIN IMPUESTOS');
+    datosBaseTiendasPropias.forEach(fila => {
+      const nombreTiendaLimpio = limpiarTexto(fila['PTO. DE VENTA']);
+      if (!tiendasProcesadas[nombreTiendaLimpio]) return;
+      const semana = getCustomWeek(fila['FECHA DE FACTURACION']);
+      if (!semana) return;
+      const tienda = tiendasProcesadas[nombreTiendaLimpio];
+      const evento = limpiarTexto(fila.EVENTO);
+      const categoria = limpiarTexto(fila['CATEGORIA DE VENTA']);
+      if (categoria === 'masivo') {
+        if (evento === 'activacion') tienda.semanas[semana].activaciones++;
+        if (evento === 'renovacion') tienda.semanas[semana].renovaciones++;
+        if (fila['SEGURO CAPTURADO']) tienda.semanas[semana].seguros++;
+        const accessFee = limpiarNumero(fila['RENTA SIN IMPUESTOS']);
+        if (accessFee > 0) { tienda.semanas[semana].accessFee += accessFee; tienda.semanas[semana].accessFeeCount++; }
+      } else if (categoria === 'empresarial') {
+        tienda.semanas[semana].empresarial++;
+      }
+    });
 
-  // Promedios separados para el detalle del modal
-  const promedioAccessFeeActivacion = calcularPromedio(activacionesMasivo, 'RENTA SIN IMPUESTOS');
-  const promedioAccessFeeRenovacion = calcularPromedio(renovacionesMasivo, 'RENTA SIN IMPUESTOS');
+    const listaDeTiendas = Object.values(tiendasProcesadas);
 
-  const datosEmpresariales = datosBaseTiendasPropias.filter(fila => limpiarTexto(fila['CATEGORIA DE VENTA']) === 'empresarial');
-  const activacionesEmpresariales = datosEmpresariales.filter(fila => limpiarTexto(fila.EVENTO) === 'activacion');
-  const renovacionesEmpresariales = datosEmpresariales.filter(fila => limpiarTexto(fila.EVENTO) === 'renovacion');
-  const detalleEmpresariales = { Activacion: { total: activacionesEmpresariales.length, Simple: activacionesEmpresariales.filter(f => limpiarTexto(f.FAMILIA) === 'simple').length, 'Simple Plus': activacionesEmpresariales.filter(f => limpiarTexto(f.FAMILIA) === 'simple plus').length, 'Armalo Negocios': activacionesEmpresariales.filter(f => limpiarTexto(f.FAMILIA) === 'armalo negocios').length }, Renovacion: { total: renovacionesEmpresariales.length, Simple: renovacionesEmpresariales.filter(f => limpiarTexto(f.FAMILIA) === 'simple').length, 'Simple Plus': renovacionesEmpresariales.filter(f => limpiarTexto(f.FAMILIA) === 'simple plus').length, 'Armalo Negocios': renovacionesEmpresariales.filter(f => limpiarTexto(f.FAMILIA) === 'armalo negocios').length } };
-  const totalEmpresariales = detalleEmpresariales.Activacion.total + detalleEmpresariales.Renovacion.total;
+    const activacionesRealesMasivo = datosMasivos.filter(f => limpiarTexto(f.EVENTO) === 'activacion');
+    const detalleActivaciones = { 'Simple': activacionesRealesMasivo.filter(f => limpiarTexto(f.FAMILIA) === 'simple').length, 'Simple Plus': activacionesRealesMasivo.filter(f => limpiarTexto(f.FAMILIA) === 'simple plus').length, 'Premium': activacionesRealesMasivo.filter(f => limpiarTexto(f.FAMILIA) === 'premium').length, };
+    const detalleEmpresariales = { 'Activación': datosEmpresariales.filter(f => limpiarTexto(f.EVENTO) === 'activacion').length, 'Renovación': datosEmpresariales.filter(f => limpiarTexto(f.EVENTO) === 'renovacion').length, };
+    const detalleAccessFee = { 'Activación': calcularPromedio(activacionesRealesMasivo, 'RENTA SIN IMPUESTOS'), 'Renovación': calcularPromedio(datosMasivos.filter(f => limpiarTexto(f.EVENTO) === 'renovacion'), 'RENTA SIN IMPUESTOS'), };
 
-  return {
-    totalActivaciones,
-    detalleActivaciones,
-    totalRenovaciones,
-    totalSeguros,
-    promedioAccessFeeGeneral,
-    promedioAccessFeeActivacion,
-    promedioAccessFeeRenovacion,
-    totalEmpresariales,
-    detalleEmpresariales,
-    resumenPorZona,
-    filasDetalladas: datosBaseTiendasPropias,
+    const calcularTotalesZona = (tiendasDeZona) => {
+      const totales = { activaciones: 0, renovaciones: 0, seguros: 0, empresarial: 0, accessFee: 0, accessFeeCount: 0, cuotas: { activaciones: 0, renovaciones: 0, seguros: 0, empresarial: 0 } };
+      tiendasDeZona.forEach(t => {
+        totales.cuotas.activaciones += t.cuotas.activaciones;
+        totales.cuotas.renovaciones += t.cuotas.renovaciones;
+        totales.cuotas.seguros += t.cuotas.seguros;
+        totales.cuotas.empresarial += t.cuotas.empresarial;
+        for (const sem of Object.values(t.semanas)) {
+          totales.activaciones += sem.activaciones; totales.renovaciones += sem.renovaciones; totales.seguros += sem.seguros; totales.empresarial += sem.empresarial; totales.accessFee += sem.accessFee; totales.accessFeeCount += sem.accessFeeCount;
+        }
+      });
+      return {
+        activaciones: { actual: totales.activaciones, cuota: totales.cuotas.activaciones, alcance: calcularAlcance(totales.activaciones, totales.cuotas.activaciones) },
+        renovaciones: { actual: totales.renovaciones, cuota: totales.cuotas.renovaciones, alcance: calcularAlcance(totales.renovaciones, totales.cuotas.renovaciones) },
+        seguros: { actual: totales.seguros, cuota: totales.cuotas.seguros, alcance: calcularAlcance(totales.seguros, totales.cuotas.seguros) },
+        empresarial: { actual: totales.empresarial, cuota: totales.cuotas.empresarial, alcance: calcularAlcance(totales.empresarial, totales.cuotas.empresarial) },
+        accessFee: totales.accessFeeCount > 0 ? totales.accessFee / totales.accessFeeCount : 0,
+      };
+    };
+
+    const resumenNorte = calcularTotalesZona(listaDeTiendas.filter(t => t.zona === 'norte'));
+    const resumenSur = calcularTotalesZona(listaDeTiendas.filter(t => t.zona === 'sur'));
+
+    const totalActivaciones = resumenNorte.activaciones.actual + resumenSur.activaciones.actual;
+    const cuotaActivaciones = resumenNorte.activaciones.cuota + resumenSur.activaciones.cuota;
+    const totalRenovaciones = resumenNorte.renovaciones.actual + resumenSur.renovaciones.actual;
+    const cuotaRenovaciones = resumenNorte.renovaciones.cuota + resumenSur.renovaciones.cuota;
+    const totalSeguros = resumenNorte.seguros.actual + resumenSur.seguros.actual;
+    const cuotaSeguros = resumenNorte.seguros.cuota + resumenSur.seguros.cuota;
+    const totalEmpresariales = resumenNorte.empresarial.actual + resumenSur.empresarial.actual;
+    const cuotaEmpresarial = resumenNorte.empresarial.cuota + resumenSur.empresarial.cuota;
+    const totalAccessFeeSuma = listaDeTiendas.reduce((acc, t) => acc + Object.values(t.semanas).reduce((sumSem, sem) => sumSem + sem.accessFee, 0), 0);
+    const totalAccessFeeCuenta = listaDeTiendas.reduce((acc, t) => acc + Object.values(t.semanas).reduce((sumSem, sem) => sumSem + sem.accessFeeCount, 0), 0);
+
+    return {
+      totalActivaciones: { actual: totalActivaciones, cuota: cuotaActivaciones, alcance: calcularAlcance(totalActivaciones, cuotaActivaciones) },
+      totalRenovaciones: { actual: totalRenovaciones, cuota: cuotaRenovaciones, alcance: calcularAlcance(totalRenovaciones, cuotaRenovaciones) },
+      totalSeguros: { actual: totalSeguros, cuota: cuotaSeguros, alcance: calcularAlcance(totalSeguros, cuotaSeguros) },
+      totalEmpresariales: { actual: totalEmpresariales, cuota: cuotaEmpresarial, alcance: calcularAlcance(totalEmpresariales, cuotaEmpresarial) },
+      promedioAccessFeeGeneral: totalAccessFeeCuenta > 0 ? totalAccessFeeSuma / totalAccessFeeCuenta : 0,
+      detallePorTienda: listaDeTiendas,
+      resumenPorZona: { norte: resumenNorte, sur: resumenSur },
+      detalleActivaciones, detalleEmpresariales, detalleAccessFee,
+    };
   };
+
+  // --- LÓGICA CORREGIDA Y COMPLETA PARA EMPRESARIAL ---
+  const procesarDatosEmpresarial = () => {
+    const datosEmpresarialesCrudos = datosActivos.filter(fila => {
+      const operacionPdv = limpiarTexto(fila['OPERACION PDV']);
+      const categoriaVenta = limpiarTexto(fila['CATEGORIA DE VENTA']);
+      return (operacionPdv === 'empresarial' || operacionPdv === 'subdistribuidor') && categoriaVenta === 'empresarial';
+    });
+
+    if (datosEmpresarialesCrudos.length === 0) {
+      return { totalActivaciones: 0, totalRenovaciones: 0, promedioAccessFeeGeneral: 0, detalleActivaciones: {}, detalleRenovaciones: {}, detallePorPtoVenta: [], rankingPtoVenta: [] };
+    }
+
+    const activaciones = datosEmpresarialesCrudos.filter(f => limpiarTexto(f.EVENTO) === 'activacion');
+    const renovaciones = datosEmpresarialesCrudos.filter(f => limpiarTexto(f.EVENTO) === 'renovacion');
+
+    const detalleActivaciones = { 'Armalo Negocios': activaciones.filter(f => limpiarTexto(f.FAMILIA) === 'armalo negocios').length };
+    const detalleRenovaciones = { 'Armalo Negocios': renovaciones.filter(f => limpiarTexto(f.FAMILIA) === 'armalo negocios').length };
+    const promedioAccessFeeActivacion = calcularPromedio(activaciones, 'RENTA SIN IMPUESTOS');
+    const promedioAccessFeeRenovacion = calcularPromedio(renovaciones, 'RENTA SIN IMPUESTOS');
+
+    const ptoVentaAgrupado = datosEmpresarialesCrudos.reduce((acc, fila) => {
+      const pto = fila['PTO. DE VENTA'] || 'Desconocido';
+      if (!acc[pto]) { acc[pto] = { ptoVenta: pto, activaciones: 0, renovaciones: 0, mix: 0 }; }
+      const evento = limpiarTexto(fila.EVENTO);
+      if (evento === 'activacion') acc[pto].activaciones++;
+      if (evento === 'renovacion') acc[pto].renovaciones++;
+      acc[pto].mix = acc[pto].activaciones + acc[pto].renovaciones;
+      return acc;
+    }, {});
+
+    const detallePorPtoVenta = Object.values(ptoVentaAgrupado);
+    const rankingPtoVenta = [...detallePorPtoVenta].sort((a, b) => b.mix - a.mix);
+
+    return {
+      totalActivaciones: activaciones.length,
+      totalRenovaciones: renovaciones.length,
+      promedioAccessFeeGeneral: calcularPromedio(datosEmpresarialesCrudos, 'RENTA SIN IMPUESTOS'),
+      detalleActivaciones,
+      detalleRenovaciones,
+      promedioAccessFeeActivacion,
+      promedioAccessFeeRenovacion,
+      detallePorPtoVenta,
+      rankingPtoVenta,
+    };
+  };
+
+  return { masivoData: procesarDatosMasivo(), empresarialData: procesarDatosEmpresarial() };
 };
 
 const Configuracion = () => {
-  const [datosProcesados, setDatosProcesados] = useState(null);
+  const [reporteFile, setReporteFile] = useState(null);
+  const [cuotasFile, setCuotasFile] = useState(null);
+  const [mes, setMes] = useState('junio');
   const [mensaje, setMensaje] = useState('');
-  const [nombreArchivo, setNombreArchivo] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleFileUpload = (e) => {
-    const archivo = e.target.files[0];
-    if (!archivo) return;
-
-    setNombreArchivo(archivo.name);
-    setMensaje('Procesando archivo, por favor espera...');
-    setDatosProcesados(null);
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = event.target.result;
-        const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-
-        const dataAsArray = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        const dataSinMetadatos = dataAsArray.slice(4);
-        const headers = dataSinMetadatos[0];
-        const dataRows = dataSinMetadatos.slice(1);
-
-        const jsonCrudo = dataRows.map(row => {
-          const rowData = {};
-          headers.forEach((header, index) => {
-            rowData[header] = row[index];
-          });
-          return rowData;
-        });
-
-        const resultados = procesadorDeDatos(jsonCrudo);
-        setDatosProcesados(resultados);
-        localStorage.setItem('dashboardData', JSON.stringify(resultados));
-        setMensaje(`¡Éxito! Archivo procesado y guardado. Ya puedes ir a la pestaña de Dashboard.`);
-      } catch (error) {
-        console.error("Error al procesar el archivo:", error);
-        setMensaje('Hubo un error al leer el archivo. Revisa el formato y las columnas.');
-      }
+  const handleProcessData = () => {
+    if (!reporteFile || !cuotasFile) { setMensaje('Por favor, carga ambos archivos para procesar.'); return; }
+    setIsProcessing(true);
+    setMensaje('Procesando datos, por favor espera...');
+    const readerReporte = new FileReader();
+    readerReporte.onload = (e) => {
+      const readerCuotas = new FileReader();
+      readerCuotas.onload = (ev) => {
+        try {
+          const workbookReporte = XLSX.read(e.target.result, { type: 'binary', cellDates: true });
+          const jsonCrudo = XLSX.utils.sheet_to_json(workbookReporte.Sheets[workbookReporte.SheetNames[0]], { range: 4 });
+          const workbookCuotas = XLSX.read(ev.target.result, { type: 'binary' });
+          const jsonCuotas = XLSX.utils.sheet_to_json(workbookCuotas.Sheets[workbookCuotas.SheetNames[0]], { range: 2 });
+          const { masivoData, empresarialData } = procesadorDeDatos(jsonCrudo, jsonCuotas, mes);
+          localStorage.setItem('masivoDashboardData', JSON.stringify(masivoData));
+          localStorage.setItem('empresarialDashboardData', JSON.stringify(empresarialData));
+          setMensaje(`¡Éxito! Datos de '${mes}' procesados y guardados.`);
+        } catch (error) {
+          console.error("Error detallado:", error);
+          setMensaje('Hubo un error al leer o procesar los archivos. Revisa la consola (F12).');
+        } finally {
+          setIsProcessing(false);
+        }
+      };
+      readerCuotas.readAsBinaryString(cuotasFile);
     };
-    reader.readAsBinaryString(archivo);
+    readerReporte.readAsBinaryString(reporteFile);
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold text-slate-800">Panel de Configuración</h1>
-      <div className="mt-8 p-6 bg-white rounded-lg shadow-md border border-slate-200">
-        <h2 className="text-2xl font-semibold text-slate-700">1. Cargar Reporte de Datos</h2>
-        <p className="mt-2 text-slate-600">
-          Selecciona el archivo de Excel. El sistema aplicará las reglas de negocio y calculará los totales.
-        </p>
-        <label className="mt-4 inline-block bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 cursor-pointer transition-colors">
-          <span>Seleccionar Archivo...</span>
-          <input
-            type="file"
-            className="hidden"
-            accept=".xlsx, .xls, .csv"
-            onChange={handleFileUpload}
-          />
-        </label>
-        {nombreArchivo && <p className="mt-2 text-sm">Archivo cargado: <strong>{nombreArchivo}</strong></p>}
-        {mensaje && <p className="mt-2 text-sm font-medium text-gray-700">{mensaje}</p>}
+    <div className="p-8 max-w-7xl mx-auto space-y-12">
+      <h1 className="text-4xl font-bold text-slate-800 text-center">Panel de Configuración</h1>
+      <div className="p-6 bg-white rounded-lg shadow-md border border-slate-200">
+        <h2 className="text-2xl font-semibold text-slate-700">1. Selecciona el Mes a Procesar</h2>
+        <p className="mt-2 text-slate-600">Escribe el nombre del mes que quieres analizar (ej. junio, julio, etc.).</p>
+        <input type="text" value={mes} onChange={(e) => setMes(e.target.value.toLowerCase())} className="mt-4 w-full md:w-1/3 p-2 border border-slate-300 rounded-md" placeholder="ej. junio" />
       </div>
-      {datosProcesados && (
-        <div className="mt-8 p-6 bg-white rounded-lg shadow-md border border-slate-200">
-          <h2 className="text-2xl font-semibold text-slate-700">Resultados del Procesamiento</h2>
-          <div className="mt-4 font-mono text-sm bg-slate-50 p-4 rounded overflow-x-auto">
-            <pre>
-              {JSON.stringify(datosProcesados, null, 2)}
-            </pre>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="p-6 bg-white rounded-lg shadow-md border border-slate-200 flex flex-col items-center text-center">
+          <UploadCloud className="w-12 h-12 text-blue-500" /><h2 className="text-2xl font-semibold text-slate-700 mt-4">2. Cargar Reporte General</h2>
+          <p className="mt-2 text-slate-600">El archivo de Excel con todas las transacciones.</p>
+          <label className="mt-4 inline-block bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 cursor-pointer transition-colors">
+            <span>{reporteFile ? "Archivo Cargado" : "Seleccionar Archivo..."}</span>
+            <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={(e) => setReporteFile(e.target.files[0])} />
+          </label>
+          {reporteFile && <p className="mt-2 text-sm text-green-600 flex items-center gap-2"><CheckCircle size={16} /> {reporteFile.name}</p>}
         </div>
-      )}
+        <div className="p-6 bg-white rounded-lg shadow-md border border-slate-200 flex flex-col items-center text-center">
+          <UploadCloud className="w-12 h-12 text-green-500" /><h2 className="text-2xl font-semibold text-slate-700 mt-4">3. Cargar Archivo de Cuotas</h2>
+          <p className="mt-2 text-slate-600">El Excel con las metas mensuales por tienda.</p>
+          <label className="mt-4 inline-block bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 cursor-pointer transition-colors">
+            <span>{cuotasFile ? "Archivo Cargado" : "Seleccionar Archivo..."}</span>
+            <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={(e) => setCuotasFile(e.target.files[0])} />
+          </label>
+          {cuotasFile && <p className="mt-2 text-sm text-green-600 flex items-center gap-2"><CheckCircle size={16} /> {cuotasFile.name}</p>}
+        </div>
+      </div>
+      <div className="text-center">
+        <button onClick={handleProcessData} disabled={!reporteFile || !cuotasFile || isProcessing} className="flex items-center justify-center gap-3 mx-auto px-8 py-4 bg-slate-800 text-white font-bold rounded-lg shadow-lg hover:bg-slate-700 transition-all disabled:bg-slate-400 disabled:cursor-not-allowed">
+          <BarChart2 />
+          {isProcessing ? "Procesando..." : "Procesar y Guardar Datos"}
+        </button>
+        {mensaje && (<p className={`mt-4 text-sm font-medium flex items-center justify-center gap-2 ${mensaje.startsWith('¡Éxito!') ? 'text-green-600' : 'text-red-600'}`}>
+          {mensaje.startsWith('¡Éxito!') ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+          {mensaje}
+        </p>)}
+      </div>
     </div>
   );
 };
