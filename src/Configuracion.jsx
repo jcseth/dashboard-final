@@ -3,14 +3,10 @@ import * as XLSX from 'xlsx';
 import { UploadCloud, CheckCircle, AlertCircle, BarChart2 } from 'lucide-react';
 
 const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
-  // --- FUNCIONES DE AYUDA ---
   const limpiarTexto = (texto) => (texto || '').toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const limpiarNumero = (valor) => {
     if (typeof valor === 'number') return valor;
-    if (typeof valor === 'string') {
-      const numero = parseFloat(String(valor).replace(/,/g, ''));
-      return isNaN(numero) ? 0 : numero;
-    }
+    if (typeof valor === 'string') { const numero = parseFloat(String(valor).replace(/,/g, '')); return isNaN(numero) ? 0 : numero; }
     return 0;
   };
   const calcularPromedio = (datos, columna) => {
@@ -33,13 +29,11 @@ const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
     } catch { return null; }
   };
 
-  // --- FILTRADO INICIAL ---
   const mesSeleccionadoLimpio = limpiarTexto(mesSeleccionado);
   const datosDelMes = (datosCrudos || []).filter(fila => limpiarTexto(fila['MES FACTURACION']) === mesSeleccionadoLimpio);
   const datosActivos = (datosDelMes || []).filter(fila => limpiarTexto(fila.ESTATUS) === 'terminada');
   const cuotasDelMes = (datosCuotas || []).filter(c => limpiarTexto(c.MES) === mesSeleccionadoLimpio);
 
-  // --- LÓGICA COMPLETA PARA MASIVO ---
   const procesarDatosMasivo = () => {
     const datosBaseTiendasPropias = datosActivos.filter(fila => limpiarTexto(fila.REGION) === '1.-centro-cdmx' && limpiarTexto(fila['OPERACION PDV'])?.startsWith('t. propias'));
     const tiendasProcesadas = {};
@@ -55,7 +49,7 @@ const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
       };
     });
     const datosMasivos = datosBaseTiendasPropias.filter(f => limpiarTexto(f['CATEGORIA DE VENTA']) === 'masivo');
-    const datosEmpresariales = datosBaseTiendasPropias.filter(f => limpiarTexto(f['CATEGORIA DE VENTA']) === 'empresarial');
+    const datosEmpresarialesEnTiendas = datosBaseTiendasPropias.filter(f => limpiarTexto(f['CATEGORIA DE VENTA']) === 'empresarial');
     datosBaseTiendasPropias.forEach(fila => {
       const nombreTiendaLimpio = limpiarTexto(fila['PTO. DE VENTA']);
       if (!tiendasProcesadas[nombreTiendaLimpio]) return;
@@ -77,7 +71,7 @@ const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
     const listaDeTiendas = Object.values(tiendasProcesadas);
     const activacionesRealesMasivo = datosMasivos.filter(f => limpiarTexto(f.EVENTO) === 'activacion');
     const detalleActivaciones = { 'Simple': activacionesRealesMasivo.filter(f => limpiarTexto(f.FAMILIA) === 'simple').length, 'Simple Plus': activacionesRealesMasivo.filter(f => limpiarTexto(f.FAMILIA) === 'simple plus').length, 'Premium': activacionesRealesMasivo.filter(f => limpiarTexto(f.FAMILIA) === 'premium').length, };
-    const detalleEmpresariales = { 'Activación': datosEmpresariales.filter(f => limpiarTexto(f.EVENTO) === 'activacion').length, 'Renovación': datosEmpresariales.filter(f => limpiarTexto(f.EVENTO) === 'renovacion').length, };
+    const detalleEmpresariales = { 'Activación': datosEmpresarialesEnTiendas.filter(f => limpiarTexto(f.EVENTO) === 'activacion').length, 'Renovación': datosEmpresarialesEnTiendas.filter(f => limpiarTexto(f.EVENTO) === 'renovacion').length, };
     const detalleAccessFee = { 'Activación': calcularPromedio(activacionesRealesMasivo, 'RENTA SIN IMPUESTOS'), 'Renovación': calcularPromedio(datosMasivos.filter(f => limpiarTexto(f.EVENTO) === 'renovacion'), 'RENTA SIN IMPUESTOS'), };
     const calcularTotalesZona = (tiendasDeZona) => {
       const totales = { activaciones: 0, renovaciones: 0, seguros: 0, empresarial: 0, accessFee: 0, accessFeeCount: 0, cuotas: { activaciones: 0, renovaciones: 0, seguros: 0, empresarial: 0 } };
