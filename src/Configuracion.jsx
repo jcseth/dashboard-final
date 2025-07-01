@@ -43,7 +43,6 @@ const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
   const procesarDatosMasivo = () => {
     const datosBaseTiendasPropias = datosActivos.filter(fila => limpiarTexto(fila.REGION) === '1.-centro-cdmx' && limpiarTexto(fila['OPERACION PDV'])?.startsWith('t. propias'));
     const tiendasProcesadas = {};
-
     cuotasDelMes.forEach(cuotaFila => {
       const nombreTiendaOriginal = cuotaFila['PTO. DE VENTA'];
       const nombreTiendaLimpio = limpiarTexto(nombreTiendaOriginal);
@@ -55,10 +54,8 @@ const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
         semanas: { semana1: { activaciones: 0, renovaciones: 0, seguros: 0, empresarial: 0, accessFee: 0, accessFeeCount: 0 }, semana2: { activaciones: 0, renovaciones: 0, seguros: 0, empresarial: 0, accessFee: 0, accessFeeCount: 0 }, semana3: { activaciones: 0, renovaciones: 0, seguros: 0, empresarial: 0, accessFee: 0, accessFeeCount: 0 }, semana4: { activaciones: 0, renovaciones: 0, seguros: 0, empresarial: 0, accessFee: 0, accessFeeCount: 0 } }
       };
     });
-
     const datosMasivos = datosBaseTiendasPropias.filter(f => limpiarTexto(f['CATEGORIA DE VENTA']) === 'masivo');
     const datosEmpresariales = datosBaseTiendasPropias.filter(f => limpiarTexto(f['CATEGORIA DE VENTA']) === 'empresarial');
-
     datosBaseTiendasPropias.forEach(fila => {
       const nombreTiendaLimpio = limpiarTexto(fila['PTO. DE VENTA']);
       if (!tiendasProcesadas[nombreTiendaLimpio]) return;
@@ -77,7 +74,6 @@ const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
         tienda.semanas[semana].empresarial++;
       }
     });
-    
     const listaDeTiendas = Object.values(tiendasProcesadas);
     const activacionesRealesMasivo = datosMasivos.filter(f => limpiarTexto(f.EVENTO) === 'activacion');
     const detalleActivaciones = { 'Simple': activacionesRealesMasivo.filter(f => limpiarTexto(f.FAMILIA) === 'simple').length, 'Simple Plus': activacionesRealesMasivo.filter(f => limpiarTexto(f.FAMILIA) === 'simple plus').length, 'Premium': activacionesRealesMasivo.filter(f => limpiarTexto(f.FAMILIA) === 'premium').length, };
@@ -86,13 +82,8 @@ const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
     const calcularTotalesZona = (tiendasDeZona) => {
       const totales = { activaciones: 0, renovaciones: 0, seguros: 0, empresarial: 0, accessFee: 0, accessFeeCount: 0, cuotas: { activaciones: 0, renovaciones: 0, seguros: 0, empresarial: 0 } };
       tiendasDeZona.forEach(t => {
-        totales.cuotas.activaciones += t.cuotas.activaciones;
-        totales.cuotas.renovaciones += t.cuotas.renovaciones;
-        totales.cuotas.seguros += t.cuotas.seguros;
-        totales.cuotas.empresarial += t.cuotas.empresarial;
-        for (const sem of Object.values(t.semanas)) {
-          totales.activaciones += sem.activaciones; totales.renovaciones += sem.renovaciones; totales.seguros += sem.seguros; totales.empresarial += sem.empresarial; totales.accessFee += sem.accessFee; totales.accessFeeCount += sem.accessFeeCount;
-        }
+        totales.cuotas.activaciones += t.cuotas.activaciones; totales.cuotas.renovaciones += t.cuotas.renovaciones; totales.cuotas.seguros += t.cuotas.seguros; totales.cuotas.empresarial += t.cuotas.empresarial;
+        for (const sem of Object.values(t.semanas)) { totales.activaciones += sem.activaciones; totales.renovaciones += sem.renovaciones; totales.seguros += sem.seguros; totales.empresarial += sem.empresarial; totales.accessFee += sem.accessFee; totales.accessFeeCount += sem.accessFeeCount; }
       });
       return {
         activaciones: { actual: totales.activaciones, cuota: totales.cuotas.activaciones, alcance: calcularAlcance(totales.activaciones, totales.cuotas.activaciones) },
@@ -126,7 +117,6 @@ const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
     };
   };
 
-  // --- LÓGICA FINAL Y CORREGIDA PARA EMPRESARIAL ---
   const procesarDatosEmpresarial = () => {
     const datosEmpresarialesCrudos = datosActivos.filter(fila => {
       const operacionPdv = limpiarTexto(fila['OPERACION PDV']);
@@ -134,26 +124,17 @@ const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
       const region = limpiarTexto(fila.REGION);
       return region === '1.-centro-cdmx' && (operacionPdv === 'empresarial' || operacionPdv === 'subdistribuidor') && categoriaVenta === 'empresarial';
     });
-
-    if (datosEmpresarialesCrudos.length === 0) {
-        return { totalActivaciones: 0, totalRenovaciones: 0, promedioAccessFeeGeneral: 0, detalleActivaciones: {}, detalleRenovaciones: {}, detallePorPtoVenta: [], rankingPtoVenta: [] };
-    }
-
+    if (datosEmpresarialesCrudos.length === 0) { return { totalActivaciones: {actual: 0, cuota: 0, alcance: 0}, totalRenovaciones: {actual: 0, cuota: 0, alcance: 0}, totalMix: {actual: 0, cuota: 0, alcance: 0}, promedioAccessFeeGeneral: 0, detalleActivaciones: {}, detalleRenovaciones: {}, detalleMix: {}, detallePorPtoVenta: [], rankingPtoVenta: [] }; }
     const activaciones = datosEmpresarialesCrudos.filter(f => limpiarTexto(f.EVENTO) === 'activacion');
     const renovaciones = datosEmpresarialesCrudos.filter(f => limpiarTexto(f.EVENTO) === 'renovacion');
-    
-    const contarArmaloYControl = (datos) => {
-        return datos.filter(f => {
-            const tipo = limpiarTexto(f['ARMALO NEGOCIos']); // Usar el nombre de columna que me diste
-            return tipo === 'armalo negocios' || tipo === 'control flotilla';
-        }).length;
-    };
-
-    const detalleActivaciones = { 'Armalo/Control': contarArmaloYControl(activaciones) };
-    const detalleRenovaciones = { 'Armalo/Control': contarArmaloYControl(renovaciones) };
+    const contarPorFamilia = (datos, familia) => datos.filter(f => limpiarTexto(f.FAMILIA) === familia).length;
+    const detalleActivaciones = { 'Armalo Negocios': contarPorFamilia(activaciones, 'armalo negocios'), 'Control Flotilla': contarPorFamilia(activaciones, 'control flotilla') };
+    const detalleRenovaciones = { 'Armalo Negocios': contarPorFamilia(renovaciones, 'armalo negocios'), 'Control Flotilla': contarPorFamilia(renovaciones, 'control flotilla') };
     const promedioAccessFeeActivacion = calcularPromedio(activaciones, 'RENTA SIN IMPUESTOS');
     const promedioAccessFeeRenovacion = calcularPromedio(renovaciones, 'RENTA SIN IMPUESTOS');
-
+    const detalleMix = { 'Activaciones': activaciones.length, 'Renovaciones': renovaciones.length };
+    const cuotaActEmpresarial = cuotasDelMes.reduce((acc, c) => acc + (limpiarNumero(c['Cuota Act Empresarial']) || 0), 0);
+    const cuotaRenEmpresarial = cuotasDelMes.reduce((acc, c) => acc + (limpiarNumero(c['Cuota Ren Empresarial']) || 0), 0);
     const ptoVentaAgrupado = datosEmpresarialesCrudos.reduce((acc, fila) => {
         const pto = fila['PTO. DE VENTA'] || 'Desconocido';
         if (!acc[pto]) { acc[pto] = { ptoVenta: pto, activaciones: 0, renovaciones: 0, mix: 0 }; }
@@ -163,16 +144,16 @@ const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
         acc[pto].mix = acc[pto].activaciones + acc[pto].renovaciones;
         return acc;
     }, {});
-
     const detallePorPtoVenta = Object.values(ptoVentaAgrupado);
     const rankingPtoVenta = [...detallePorPtoVenta].sort((a, b) => b.mix - a.mix);
-
     return {
-      totalActivaciones: activaciones.length,
-      totalRenovaciones: renovaciones.length,
+      totalActivaciones: { actual: activaciones.length, cuota: cuotaActEmpresarial, alcance: calcularAlcance(activaciones.length, cuotaActEmpresarial) },
+      totalRenovaciones: { actual: renovaciones.length, cuota: cuotaRenEmpresarial, alcance: calcularAlcance(renovaciones.length, cuotaRenEmpresarial) },
+      totalMix: { actual: activaciones.length + renovaciones.length, cuota: cuotaActEmpresarial + cuotaRenEmpresarial, alcance: calcularAlcance(activaciones.length + renovaciones.length, cuotaActEmpresarial + cuotaRenEmpresarial) },
       promedioAccessFeeGeneral: calcularPromedio(datosEmpresarialesCrudos, 'RENTA SIN IMPUESTOS'),
       detalleActivaciones,
       detalleRenovaciones,
+      detalleMix,
       promedioAccessFeeActivacion,
       promedioAccessFeeRenovacion,
       detallePorPtoVenta,
@@ -189,7 +170,6 @@ const Configuracion = () => {
   const [mes, setMes] = useState('junio');
   const [mensaje, setMensaje] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-
   const handleProcessData = () => {
     if (!reporteFile || !cuotasFile) { setMensaje('Por favor, carga ambos archivos para procesar.'); return; }
     setIsProcessing(true);
@@ -218,7 +198,6 @@ const Configuracion = () => {
     };
     readerReporte.readAsBinaryString(reporteFile);
   };
-
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-12">
       <h1 className="text-4xl font-bold text-slate-800 text-center">Panel de Configuración</h1>
