@@ -3,17 +3,32 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Users, TrendingUp, DollarSign, ChevronDown, ChevronUp, ClipboardList, Building } from 'lucide-react';
 
 const CardBackDetails = ({ title, data }) => {
+  const formatCurrency = (value) => `$${parseFloat(value || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const formatKey = (key) => key.replace(/([A-Z])/g, ' $1').trim();
   const dataToShow = data || {};
+  
+  // Separar los subtotales para darles un estilo diferente
+  const mainDetails = Object.entries(dataToShow).filter(([key]) => !key.startsWith('Subtotal'));
+  const subDetails = Object.entries(dataToShow).filter(([key]) => key.startsWith('Subtotal'));
+
   return (
     <div className="p-4 text-xs text-left w-full h-full flex flex-col justify-center">
       <h4 className="font-bold text-sm mb-2 text-center">{title}</h4>
       <div className="space-y-1">
-        {Object.entries(dataToShow).map(([key, value]) => (
+        {mainDetails.map(([key, value]) => (
           <div key={key} className="flex justify-between items-center bg-slate-700/50 p-1 rounded">
             <span className="text-slate-300">{formatKey(key)}:</span>
             <span className="font-bold text-white">
               {typeof value === 'string' ? value : (value || 0).toLocaleString('es-MX')}
+            </span>
+          </div>
+        ))}
+        {subDetails.length > 0 && <hr className="border-slate-600 my-2" />}
+        {subDetails.map(([key, value]) => (
+          <div key={key} className="flex justify-between items-center bg-slate-600/50 p-1 rounded">
+            <span className="text-slate-400 italic text-xs">{formatKey(key).replace('Tiendas Emp ', '')}:</span>
+            <span className="font-semibold text-white/90 text-xs">
+              {(value || 0).toLocaleString('es-MX')}
             </span>
           </div>
         ))}
