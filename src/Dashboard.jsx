@@ -111,7 +111,7 @@ const StoreChart = ({ storeData, color }) => {
     { name: 'Seguros', Real: totales.seguros, Meta: storeData.cuotas.seguros },
     { name: 'Emp.', Real: totales.empresarial, Meta: storeData.cuotas.empresarial },
   ];
-  
+
   return (
     <div className="mt-4 h-64 bg-white p-4 rounded-lg border border-slate-200">
       <ResponsiveContainer width="100%" height="100%">
