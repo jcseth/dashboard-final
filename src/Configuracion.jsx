@@ -1,12 +1,17 @@
+// --- INICIO DEL ARCHIVO COMPLETO Y VERIFICADO: Configuracion.jsx ---
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { UploadCloud, CheckCircle, AlertCircle, BarChart2 } from 'lucide-react';
 
 const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
+  // --- FUNCIONES DE AYUDA ---
   const limpiarTexto = (texto) => (texto || '').toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const limpiarNumero = (valor) => {
     if (typeof valor === 'number') return valor;
-    if (typeof valor === 'string') { const numero = parseFloat(String(valor).replace(/,/g, '')); return isNaN(numero) ? 0 : numero; }
+    if (typeof valor === 'string') {
+      const numero = parseFloat(String(valor).replace(/,/g, ''));
+      return isNaN(numero) ? 0 : numero;
+    }
     return 0;
   };
   const calcularPromedio = (datos, columna) => {
@@ -29,11 +34,13 @@ const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
     } catch { return null; }
   };
 
+  // --- FILTRADO INICIAL ---
   const mesSeleccionadoLimpio = limpiarTexto(mesSeleccionado);
   const datosDelMes = (datosCrudos || []).filter(fila => limpiarTexto(fila['MES FACTURACION']) === mesSeleccionadoLimpio);
   const datosActivos = (datosDelMes || []).filter(fila => limpiarTexto(fila.ESTATUS) === 'terminada');
   const cuotasDelMes = (datosCuotas || []).filter(c => limpiarTexto(c.MES) === mesSeleccionadoLimpio);
 
+  // --- LÓGICA COMPLETA PARA MASIVO ---
   const procesarDatosMasivo = () => {
     const datosBaseTiendasPropias = datosActivos.filter(fila => limpiarTexto(fila.REGION) === '1.-centro-cdmx' && limpiarTexto(fila['OPERACION PDV'])?.startsWith('t. propias'));
     const tiendasProcesadas = {};
@@ -116,19 +123,43 @@ const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
       const operacionPdv = limpiarTexto(fila['OPERACION PDV']);
       const categoriaVenta = limpiarTexto(fila['CATEGORIA DE VENTA']);
       const region = limpiarTexto(fila.REGION);
-      return region === '1.-centro-cdmx' && (operacionPdv === 'empresarial' || operacionPdv === 'subdistribuidor') && categoriaVenta === 'empresarial';
+      return region === '1.-centro-cdmx' && (operacionPdv === 'empresarial' || operacionPdv === 'subdistribuidor' || operacionPdv.startsWith('t. propias')) && categoriaVenta === 'empresarial';
     });
-    if (datosEmpresarialesCrudos.length === 0) { return { totalActivaciones: {actual: 0, cuota: 0, alcance: 0}, totalRenovaciones: {actual: 0, cuota: 0, alcance: 0}, totalMix: {actual: 0, cuota: 0, alcance: 0}, promedioAccessFeeGeneral: 0, detalleActivaciones: {}, detalleRenovaciones: {}, detalleMix: {}, detallePorPtoVenta: [], rankingPtoVenta: [] }; }
+
+    if (datosEmpresarialesCrudos.length === 0) {
+      return { totalActivaciones: {actual: 0, cuota: 0, alcance: 0}, totalRenovaciones: {actual: 0, cuota: 0, alcance: 0}, totalMix: {actual: 0, cuota: 0, alcance: 0}, promedioAccessFeeGeneral: 0, detalleActivaciones: {}, detalleRenovaciones: {}, detalleMix: {}, detallePorPtoVenta: [], rankingPtoVenta: [] };
+    }
+    
     const activaciones = datosEmpresarialesCrudos.filter(f => limpiarTexto(f.EVENTO) === 'activacion');
     const renovaciones = datosEmpresarialesCrudos.filter(f => limpiarTexto(f.EVENTO) === 'renovacion');
-    const contarPorFamilia = (datos, familia) => datos.filter(f => limpiarTexto(f.FAMILIA) === familia).length;
-    const detalleActivaciones = { 'Armalo Negocios': contarPorFamilia(activaciones, 'armalo negocios'), 'Control Flotilla': contarPorFamilia(activaciones, 'control flotilla') };
-    const detalleRenovaciones = { 'Armalo Negocios': contarPorFamilia(renovaciones, 'armalo negocios'), 'Control Flotilla': contarPorFamilia(renovaciones, 'control flotilla') };
+    
+    const contarPorFamilia = (datos, familia) => {
+        const familiaLimpia = limpiarTexto(familia);
+        if (familiaLimpia === 'armalo negocios') {
+            return datos.filter(f => {
+                const fam = limpiarTexto(f.FAMILIA);
+                return fam === 'armalo negocios' || fam === 'con todo';
+            }).length;
+        }
+        return datos.filter(f => limpiarTexto(f.FAMILIA) === familiaLimpia).length;
+    };
+    
+    const detalleActivaciones = { 'Armalo Negocios': contarPorFamilia(activaciones, 'armalo negocios'), 'Simple': contarPorFamilia(activaciones, 'simple') };
+    const detalleRenovaciones = { 'Armalo Negocios': contarPorFamilia(renovaciones, 'armalo negocios'), 'Simple': contarPorFamilia(renovaciones, 'simple') };
+    
+    const datosSoloDeTiendasEmp = datosEmpresarialesCrudos.filter(f => limpiarTexto(f['OPERACION PDV']) === 'empresarial');
+    const activacionesTiendasEmp = datosSoloDeTiendasEmp.filter(f => limpiarTexto(f.EVENTO) === 'activacion');
+    
+    detalleActivaciones['Tiendas Emp. (Armalo)'] = contarPorFamilia(activacionesTiendasEmp, 'armalo negocios');
+    detalleActivaciones['Tiendas Emp. (Simple)'] = contarPorFamilia(activacionesTiendasEmp, 'simple');
+
     const promedioAccessFeeActivacion = calcularPromedio(activaciones, 'RENTA SIN IMPUESTOS');
     const promedioAccessFeeRenovacion = calcularPromedio(renovaciones, 'RENTA SIN IMPUESTOS');
     const detalleMix = { 'Activaciones': activaciones.length, 'Renovaciones': renovaciones.length };
+    
     const cuotaActEmpresarial = cuotasDelMes.reduce((acc, c) => acc + (limpiarNumero(c['Cuota Act Empresarial']) || 0), 0);
     const cuotaRenEmpresarial = cuotasDelMes.reduce((acc, c) => acc + (limpiarNumero(c['Cuota Ren Empresarial']) || 0), 0);
+    
     const ptoVentaAgrupado = datosEmpresarialesCrudos.reduce((acc, fila) => {
         const pto = fila['PTO. DE VENTA'] || 'Desconocido';
         if (!acc[pto]) { acc[pto] = { ptoVenta: pto, activaciones: 0, renovaciones: 0, mix: 0 }; }
@@ -138,8 +169,10 @@ const procesadorDeDatos = (datosCrudos, datosCuotas, mesSeleccionado) => {
         acc[pto].mix = acc[pto].activaciones + acc[pto].renovaciones;
         return acc;
     }, {});
+
     const detallePorPtoVenta = Object.values(ptoVentaAgrupado);
     const rankingPtoVenta = [...detallePorPtoVenta].sort((a, b) => b.mix - a.mix);
+
     return {
       totalActivaciones: { actual: activaciones.length, cuota: cuotaActEmpresarial, alcance: calcularAlcance(activaciones.length, cuotaActEmpresarial) },
       totalRenovaciones: { actual: renovaciones.length, cuota: cuotaRenEmpresarial, alcance: calcularAlcance(renovaciones.length, cuotaRenEmpresarial) },
@@ -164,6 +197,7 @@ const Configuracion = () => {
   const [mes, setMes] = useState('junio');
   const [mensaje, setMensaje] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+
   const handleProcessData = () => {
     if (!reporteFile || !cuotasFile) { setMensaje('Por favor, carga ambos archivos para procesar.'); return; }
     setIsProcessing(true);
@@ -192,6 +226,7 @@ const Configuracion = () => {
     };
     readerReporte.readAsBinaryString(reporteFile);
   };
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-12">
       <h1 className="text-4xl font-bold text-slate-800 text-center">Panel de Configuración</h1>
@@ -233,5 +268,5 @@ const Configuracion = () => {
     </div>
   );
 };
-
+// --- FIN DEL ARCHIVO COMPLETO Y VERIFICADO: Configuracion.jsx ---
 export default Configuracion;
